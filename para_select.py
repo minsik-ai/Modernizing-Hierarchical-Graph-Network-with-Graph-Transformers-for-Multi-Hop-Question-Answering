@@ -188,6 +188,7 @@ class ParaSelectorTrainer(object):
                 eval_loss += tmp_eval_loss.item()
             nb_eval_steps += 1
 
+            print(logits)
             pred = 1 if logits.squeeze(-1).item() > 0 else 0
             pred = np.array([pred])
             if preds is None:
