@@ -400,6 +400,7 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
 
             # `answer_type_lbl`: [span, entity, yes/no]
             # `span_idx` for answer within the given context of length "n"
+            span_idx = None
             if (example.answer.lower() in ["yes", "no"]) and (example._type == "comparison"):
                 answer_type_lbl = 2  # Yes/no type
             else:
