@@ -35,7 +35,7 @@ class ParagraphSelector(BertPreTrainedModel):
         if labels is not None:
             loss_fct = nn.BCEWithLogitsLoss()
             labels = labels.type_as(logits)
-            labels = labels.astype(int)
+            labels = labels.int()
             print("Labels: ", labels)
             print("Logits: ", logits)
             loss = loss_fct(logits.squeeze(-1), labels)
