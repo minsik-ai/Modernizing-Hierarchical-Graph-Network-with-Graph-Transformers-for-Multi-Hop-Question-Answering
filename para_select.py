@@ -40,8 +40,7 @@ class ParagraphSelector(BertPreTrainedModel):
             print("Logits: ", logits)
             loss = loss_fct(logits.squeeze(-1), labels)
         print("Loss: ", loss.item())
-        print("Outputs: ", outputs)
-        outputs = (loss,) + (logits,) + outputs
+        outputs = (loss,) + (logits,)
         return outputs  # (loss,), (binary_logits), logits_bert, (hidden_states), (attentions)
 
 
