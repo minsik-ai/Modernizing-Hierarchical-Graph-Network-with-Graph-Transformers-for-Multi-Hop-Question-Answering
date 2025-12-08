@@ -91,12 +91,12 @@ class Trainer(object):
                     inputs['token_type_ids'] = batch[2]
                 outputs = self.model(**inputs)
 
-                losses = outputs[0]  # TODO: Multiple losses for each loss term
+                loss = outputs[0]  # TODO: Multiple losses for each loss term
 
                 if self.args.gradient_accumulation_steps > 1:
                     # loss = loss / self.args.gradient_accumulation_steps
-                    print("Losses: ", outputs)
-                    loss = sum(losses.values()) / self.args.gradient_accumulation_steps
+                    # print("Losses: ", outputs)
+                    loss = loss / self.args.gradient_accumulation_steps
 
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.max_grad_norm)
