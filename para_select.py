@@ -36,10 +36,7 @@ class ParagraphSelector(BertPreTrainedModel):
             loss_fct = nn.BCEWithLogitsLoss()
             labels = nn.functional.one_hot(labels, num_classes=2)
             labels = labels.type_as(logits)
-            print("Labels: ", labels)
-            print("Logits: ", logits)
             loss = loss_fct(logits.squeeze(-1), labels)
-        print("Loss: ", loss.item())
         outputs = (loss,) + (logits,)
         return outputs  # (loss,), (binary_logits), logits_bert, (hidden_states), (attentions)
 
@@ -188,7 +185,6 @@ class ParaSelectorTrainer(object):
                 eval_loss += tmp_eval_loss.item()
             nb_eval_steps += 1
 
-            print(logits)
             pred = 1 if logits[0][1] > logits[0][0] else 0
             pred = np.array([pred])
             if preds is None:
