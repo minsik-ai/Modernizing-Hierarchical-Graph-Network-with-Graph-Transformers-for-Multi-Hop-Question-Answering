@@ -95,6 +95,7 @@ class Trainer(object):
 
                 if self.args.gradient_accumulation_steps > 1:
                     # loss = loss / self.args.gradient_accumulation_steps
+                    print("Losses: ",losses)
                     loss = sum(losses.values()) / self.args.gradient_accumulation_steps
 
                 loss.backward()
