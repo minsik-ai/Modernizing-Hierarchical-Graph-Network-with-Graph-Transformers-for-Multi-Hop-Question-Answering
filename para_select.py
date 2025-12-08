@@ -189,7 +189,7 @@ class ParaSelectorTrainer(object):
             nb_eval_steps += 1
 
             print(logits)
-            pred = 1 if logits[1] > logits[0] else 0
+            pred = 1 if logits[0][1] > logits[0][0] else 0
             pred = np.array([pred])
             if preds is None:
                 preds = pred
