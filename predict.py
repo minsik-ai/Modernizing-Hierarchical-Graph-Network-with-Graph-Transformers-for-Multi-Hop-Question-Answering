@@ -131,7 +131,7 @@ class ParaPredictor(object):
             nb_eval_steps += 1
 
             sig_out = F.sigmoid(logits)
-            print("Sigmoid output: ", sig_out)
-            preds.append(sig_out.item())
+            # print("Sigmoid output: ", sig_out)
+            preds.append(1 if sig_out[0][1] > sig_out[0][0] else 0)
 
         return np.array(preds)
