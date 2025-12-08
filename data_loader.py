@@ -295,6 +295,7 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
             # Concatenate all the selected paragraphs to construct `C` (i.e., the context)
             context_titles, context_list = zip(*example.context)
             context_titles_selected = np.array(context_titles)[para_list].tolist()
+            print("Context List: ", context_list)
             context_selected = np.array(context_list)[para_list].tolist()
 
             # node_idx: the node_idx for paragraph, sentence and entities (for graph construction)
