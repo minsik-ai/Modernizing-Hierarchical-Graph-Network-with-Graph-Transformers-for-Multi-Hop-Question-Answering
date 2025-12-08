@@ -297,7 +297,7 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
             context_titles_selected = np.array(context_titles)[para_list].tolist()
             print("Context List: ", context_list)
             print("Para List: ", para_list)
-            context_selected = np.array(context_list)[para_list].tolist()
+            context_selected = np.array(context_list, dtype=object)[para_list].tolist()
 
             # node_idx: the node_idx for paragraph, sentence and entities (for graph construction)
             # *_span_list: the start_idx & end_idx for paragraphs, sentences and entities for (node initialization)
