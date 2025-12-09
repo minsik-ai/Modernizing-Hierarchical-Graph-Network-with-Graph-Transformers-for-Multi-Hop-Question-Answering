@@ -314,6 +314,8 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss()
         loss_start = loss_fct(start_logits, start_pos)
+        print("End Pos: ", end_pos)
+        print("End Pos Min Max: ", end_pos.min(), end_pos.max())
         loss_end = loss_fct(end_logits, end_pos)
         loss_type = loss_fct(answer_type_logits, answer_type_lbl)
 
