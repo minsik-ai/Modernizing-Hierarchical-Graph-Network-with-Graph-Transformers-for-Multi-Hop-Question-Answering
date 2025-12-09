@@ -183,6 +183,11 @@ class Trainer(object):
                 eval_loss += tmp_eval_loss.mean().item()
             nb_eval_steps += 1
 
+            # Debug: print logits during eval
+            if nb_eval_steps <= 5:
+                logits_vals = answer_type_logits.detach().cpu().numpy().flatten()
+                print(f"[EVAL DEBUG] step={nb_eval_steps}, logits={logits_vals}")
+
             # Get predictions from answer_type_logits
             type_preds = answer_type_logits.argmax(dim=-1).detach().cpu().numpy()
             answer_type_lbl = labels[2]  # (para_lbl, sent_lbl, answer_type_lbl, span_idx)
@@ -266,6 +271,10 @@ class Trainer(object):
 
         try:
             state_dict = torch.load(model_path, map_location=self.device)
+            # Debug: Check a sample weight before/after loading
+            sample_key = 'answer_type_mlp.0.weight'
+            if sample_key in state_dict:
+                print(f"[LOAD DEBUG] Loaded weight sample: {state_dict[sample_key][0][:5]}")
             self.model.load_state_dict(state_dict)
             self.model.to(self.device)
             logger.info("***** Model Loaded *****")
