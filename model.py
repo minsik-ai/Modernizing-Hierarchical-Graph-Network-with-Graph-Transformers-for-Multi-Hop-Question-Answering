@@ -190,7 +190,7 @@ class NumericHGN(nn.Module):
         self.answer_type_mlp = nn.Sequential(
             nn.Linear(self.config.hidden_size * 4, self.config.hidden_size),
             nn.ReLU(),
-            nn.Dropout(0.1),
+            nn.Dropout(0.5),  # High dropout to reduce overfitting
             nn.Linear(self.config.hidden_size, 3)
         )
 
@@ -368,9 +368,7 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-        # Focal loss for answer type classification
-        # Focal loss: FL(p_t) = -alpha * (1-p_t)^gamma * log(p_t)
-        # This down-weights easy examples and focuses on hard ones
+        # Focal loss for answer type classification with label smoothing
         gamma = 2.0  # focusing parameter
         type_weights = torch.tensor([1.0, 3.0, 10.0], device=answer_type_logits.device)
 
@@ -378,8 +376,8 @@ class NumericHGN(nn.Module):
         temperature = 1.5 if self.training else 1.0
         scaled_logits = answer_type_logits / temperature
 
-        # Compute focal loss manually
-        ce_loss = F.cross_entropy(scaled_logits, answer_type_lbl, weight=type_weights, reduction='none')
+        # Compute focal loss with label smoothing (0.1)
+        ce_loss = F.cross_entropy(scaled_logits, answer_type_lbl, weight=type_weights, reduction='none', label_smoothing=0.1)
         pt = torch.exp(-ce_loss)  # probability of correct class
         focal_weight = (1 - pt) ** gamma
         loss_type = (focal_weight * ce_loss).mean()
