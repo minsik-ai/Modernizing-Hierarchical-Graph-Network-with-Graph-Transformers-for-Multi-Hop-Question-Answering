@@ -99,9 +99,9 @@ class Trainer(object):
                 if step % 50 == 0:
                     pred_type = answer_type_logits.argmax(dim=-1).item()
                     true_type = labels[2].item()  # answer_type_lbl
-                    print(f"[TRAIN DEBUG] step={step}, loss_start={loss_start.item():.4f}, loss_end={loss_end.item():.4f}, loss_type={loss_type.item():.4f}, pred={pred_type}, true={true_type}")
+                    print(f"[TRAIN DEBUG] step={step}, loss_type={loss_type.item():.4f}, pred={pred_type}, true={true_type}")
 
-                loss = loss_start + loss_end + loss_type  # Combined loss
+                loss = loss_type  # Only use answer type loss for now
 
                 if self.args.gradient_accumulation_steps > 1:
                     # loss = loss / self.args.gradient_accumulation_steps
@@ -177,7 +177,7 @@ class Trainer(object):
                     inputs['token_type_ids'] = batch[2]
                 outputs = self.model(**inputs)
                 loss_start, loss_end, loss_type, start_logits, end_logits, answer_type_logits = outputs
-                tmp_eval_loss = loss_start + loss_end + loss_type
+                tmp_eval_loss = loss_type
 
                 eval_loss += tmp_eval_loss.mean().item()
             nb_eval_steps += 1
