@@ -348,9 +348,9 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-        # Class weights for answer type: class 0 (span)=56%, class 1 (entity)=25%, class 2 (yes/no)=19%
-        # Weight inversely proportional to frequency to handle imbalance
-        type_weights = torch.tensor([1.0, 2.25, 3.0], device=answer_type_logits.device)
+        # Class weights for answer type: class 0=185, class 1=118, class 2=17
+        # More aggressive weights to prevent converging to majority class
+        type_weights = torch.tensor([0.5, 1.5, 10.0], device=answer_type_logits.device)
         loss_fct_type = nn.CrossEntropyLoss(weight=type_weights)
 
         # Clamp positions to valid range or set to -1 (ignored)
