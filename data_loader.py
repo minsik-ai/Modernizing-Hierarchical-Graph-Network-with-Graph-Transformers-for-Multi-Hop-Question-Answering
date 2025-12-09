@@ -409,7 +409,7 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
             answer_tok = tokenizer.tokenize(example.answer)
             context_tok = tokenizer.tokenize(context)
 
-            span_idx = (0, len(context_tok))  # Default value
+            span_idx = (-1, -1)  # Default to invalid (will be ignored by loss)
             if (example.answer.lower() in ["yes", "no"]) and (example._type == "comparison"):
                 answer_type_lbl = 2  # Yes/no type
             else:
@@ -420,6 +420,7 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
                 for sub_i in range(len(context_tok) - len(answer_tok)):
                     if context_tok[sub_i : sub_i + len(answer_tok)] == answer_tok:
                         span_idx = (sub_i, sub_i + len(answer_tok))  # The answer `span_idx` (ground-truth)
+                        break  # Found the answer, stop searching
 
             print("node_idx: ", node_idx)
             print("span_idx[entity]: ", len(span_dict["entity"]))
