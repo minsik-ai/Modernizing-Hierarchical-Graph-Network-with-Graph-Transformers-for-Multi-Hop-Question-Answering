@@ -327,21 +327,26 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
                     except TypeError as e:
                         print("Error: {} / Sent: {}".format(e, sent))
                     ent_list = list(set([e.text.lower() for e in doc.ents]))
-                    all_ent_list.extend(ent_list)
                     sent_seq = tokenizer.tokenize(sent)
                     sent_span_list.append((sent_start, sent_start + len(sent_seq)))
                     for ent in ent_list:
-                        node_idx[i][sent_idx].append(ent_idx)  # Entity index list (within j_th sentence)
                         ent_tok = tokenizer.tokenize(ent)
+                        ent_found = False
                         for k in range(len(sent_seq) - len(ent_tok)):
                             if sent_seq[k : k + len(ent_tok)] == ent_tok:
                                 ent_span_list.append((sent_start + k, sent_start + k + len(ent_tok)))  # Entity span found
+                                ent_found = True
                                 break
-                        ent_idx += 1
+                        # Only add to node_idx and increment ent_idx if entity span was found
+                        if ent_found:
+                            node_idx[i][sent_idx].append(ent_idx)  # Entity index list (within j_th sentence)
+                            all_ent_list.append(ent)  # Track only found entities
+                            ent_idx += 1
                     sent_idx += 1
                     sent_start += len(sent_seq)
 
             assert len(all_ent_list) == ent_idx
+            assert len(ent_span_list) == ent_idx
 
             all_ent_dict = dict(zip(all_ent_list, list(range(ent_idx))))  # `all_ent_dict` to assign ent_idx to question node
             q_idx = 0
