@@ -365,4 +365,4 @@ class NumericHGN(nn.Module):
         losses["end"] = loss_end
         losses["type"] = loss_type
 
-        return loss_start, loss_end, loss_type
+        return loss_start, loss_end, loss_type, start_logits, end_logits, answer_type_logits

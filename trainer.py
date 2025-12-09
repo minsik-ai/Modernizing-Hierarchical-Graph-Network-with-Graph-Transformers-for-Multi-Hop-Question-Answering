@@ -91,8 +91,9 @@ class Trainer(object):
                     inputs['token_type_ids'] = batch[2]
                 print("Inputs: ",inputs)
                 outputs = self.model(**inputs)
+                loss_start, loss_end, loss_type, _, _, _ = outputs
 
-                loss = outputs[0]  # TODO: Multiple losses for each loss term
+                loss = loss_start + loss_end + loss_type  # Combined loss
 
                 if self.args.gradient_accumulation_steps > 1:
                     # loss = loss / self.args.gradient_accumulation_steps
@@ -151,45 +152,42 @@ class Trainer(object):
 
         self.model.eval()
 
-        for batch in tqdm(eval_dataloader, desc="Evaluating"):
+        for step, batch in enumerate(tqdm(eval_dataloader, desc="Evaluating")):
             batch = tuple(t.to(self.device) for t in batch)
             with torch.no_grad():
+                labels = (batch[3], batch[4], batch[5], batch[6])
+                question_ends = batch[7]
                 inputs = {'input_ids': batch[0],
                           'attention_mask': batch[1],
-                          'labels': batch[3]}
+                          'token_type_ids': batch[2],
+                          'labels': labels,
+                          'graph_out': self.graph_out[step],
+                          'question_ends': question_ends}
                 if self.args.model_type != 'distilkobert':
                     inputs['token_type_ids'] = batch[2]
-                outputs = self.model(**inputs)  # (loss), logits, (hidden_states), (attentions)
-                tmp_eval_loss, logits = outputs[:2]
-                bert_hidden_states = outputs[2][0]
-                bert_cls_rep = bert_hidden_states[:, :1, :].squeeze(-2).clone()
+                outputs = self.model(**inputs)
+                loss_start, loss_end, loss_type, start_logits, end_logits, answer_type_logits = outputs
+                tmp_eval_loss = loss_start + loss_end + loss_type
 
                 eval_loss += tmp_eval_loss.mean().item()
             nb_eval_steps += 1
 
-            if preds is None:
-                preds = logits.detach().cpu().numpy()
-                out_label_ids = inputs['labels'].detach().cpu().numpy()
-            else:
-                preds = np.append(preds, logits.detach().cpu().numpy(), axis=0)
-                out_label_ids = np.append(
-                    out_label_ids, inputs['labels'].detach().cpu().numpy(), axis=0)
+            # Get predictions from answer_type_logits
+            type_preds = answer_type_logits.argmax(dim=-1).detach().cpu().numpy()
+            answer_type_lbl = labels[2]  # (para_lbl, sent_lbl, answer_type_lbl, span_idx)
 
-            if self.hidden_states_list is None:
-                self.hidden_states_list = bert_cls_rep
-                self.labels_list = inputs['labels']
+            if preds is None:
+                preds = type_preds
+                out_label_ids = answer_type_lbl.detach().cpu().numpy()
             else:
-                self.hidden_states_list = torch.cat((self.hidden_states_list, bert_cls_rep), 0)
-                self.labels_list = torch.cat((self.labels_list, inputs['labels']), 0)
-                # print("self.hidden_states_list (shape) >> ", self.hidden_states_list.shape)
-                # print("self.labels_list (shape) >> ", self.labels_list.shape)
+                preds = np.append(preds, type_preds, axis=0)
+                out_label_ids = np.append(out_label_ids, answer_type_lbl.detach().cpu().numpy(), axis=0)
 
         eval_loss = eval_loss / nb_eval_steps
         results = {
             "loss": eval_loss
         }
 
-        preds = np.argmax(preds, axis=1)
         result = compute_metrics(preds, out_label_ids)
         results.update(result)
 
