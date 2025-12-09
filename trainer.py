@@ -89,6 +89,7 @@ class Trainer(object):
                           'question_ends': question_ends}
                 if self.args.model_type != 'distilkobert':
                     inputs['token_type_ids'] = batch[2]
+                print("Inputs: ",inputs)
                 outputs = self.model(**inputs)
 
                 loss = outputs[0]  # TODO: Multiple losses for each loss term
