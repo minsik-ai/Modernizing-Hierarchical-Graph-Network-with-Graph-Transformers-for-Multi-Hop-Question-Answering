@@ -186,7 +186,8 @@ class Trainer(object):
             # Debug: print logits during eval
             if nb_eval_steps <= 5:
                 logits_vals = answer_type_logits.detach().cpu().numpy().flatten()
-                print(f"[EVAL DEBUG] step={nb_eval_steps}, logits={logits_vals}")
+                true_lbl = labels[2].item()
+                print(f"[EVAL DEBUG] step={nb_eval_steps}, logits={logits_vals}, true={true_lbl}, graph_idx={graph_idx}, total_graphs={len(self.graph_out)}")
 
             # Get predictions from answer_type_logits
             type_preds = answer_type_logits.argmax(dim=-1).detach().cpu().numpy()
