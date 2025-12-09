@@ -22,9 +22,14 @@ def main(args):
     if args.do_train:
         trainer.train()
         trainer.save_model()
+        # Evaluate on train data immediately after training (no load)
+        print("\n=== Evaluating on TRAIN data (without reload) ===")
+        trainer.evaluate("train")
 
     if args.do_eval:
         trainer.load_model()
+        # Try evaluating on train data to check if model learned
+        # trainer.evaluate("train")  # Uncomment to test on train
         trainer.evaluate("dev")
 
 

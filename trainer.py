@@ -144,8 +144,10 @@ class Trainer(object):
             dataset = self.test_dataset
         elif mode == 'dev':
             dataset = self.dev_dataset
+        elif mode == 'train':
+            dataset = self.train_dataset
         else:
-            raise Exception("Only dev and test dataset available")
+            raise Exception("Only train, dev and test dataset available")
 
         eval_sampler = SequentialSampler(dataset)
         eval_dataloader = DataLoader(dataset, sampler=eval_sampler, batch_size=self.args.eval_batch_size)
