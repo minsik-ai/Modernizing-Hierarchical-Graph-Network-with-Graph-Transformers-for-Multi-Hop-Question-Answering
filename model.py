@@ -351,13 +351,17 @@ class NumericHGN(nn.Module):
         valid_start = start_pos.item() >= 0 and start_pos.item() < num_classes
         valid_end = end_pos.item() >= 0 and end_pos.item() < num_classes
 
-        if not valid_start:
-            start_pos = torch.tensor([-1], device=start_pos.device)
-        if not valid_end:
-            end_pos = torch.tensor([-1], device=end_pos.device)
+        # Only compute span losses if positions are valid, otherwise set to 0
+        if valid_start:
+            loss_start = loss_fct(start_logits, start_pos)
+        else:
+            loss_start = torch.tensor(0.0, device=start_logits.device)
 
-        loss_start = loss_fct(start_logits, start_pos)
-        loss_end = loss_fct(end_logits, end_pos)
+        if valid_end:
+            loss_end = loss_fct(end_logits, end_pos)
+        else:
+            loss_end = torch.tensor(0.0, device=end_logits.device)
+
         loss_type = loss_fct_type(answer_type_logits, answer_type_lbl)
 
         losses["start"] = loss_start
