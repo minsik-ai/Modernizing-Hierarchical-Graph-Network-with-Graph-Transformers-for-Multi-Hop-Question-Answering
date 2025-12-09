@@ -412,7 +412,7 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
                 context_tok = tokenizer.tokenize(context)
                 for sub_i in range(len(context_tok) - len(answer_tok)):
                     if context_tok[sub_i : sub_i + len(answer_tok)] == answer_tok:
-                        span_idx = (sub_i, sub_i + len(answer_tok))  # The answer `span_idx` (ground-truth)
+                        span_idx = (sub_i, 1)  # The answer `span_idx` (ground-truth)
 
             print("node_idx: ", node_idx)
             print("span_idx[entity]: ", len(span_dict["entity"]))
