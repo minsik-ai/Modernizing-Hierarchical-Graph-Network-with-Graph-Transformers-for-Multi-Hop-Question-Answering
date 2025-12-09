@@ -240,30 +240,34 @@ class NumericHGN(nn.Module):
         M_temp = M.squeeze(-2)  # TODO: This only works for `batch_size = 1` case
         max_len = M_temp.size(0)
 
-        # Keep original tensor sizes to match graph node counts, but only fill valid spans
-        para_node_input = torch.zeros(len(para_idx), self.config.hidden_size * 2).to(M.device)
-        sent_node_input = torch.zeros(len(sent_idx), self.config.hidden_size * 2).to(M.device)
-        ent_node_input = torch.zeros(len(ent_idx), self.config.hidden_size * 2).to(M.device)
+        # Use graph node counts as source of truth to ensure feature/node count match
+        num_para_nodes = g.num_nodes('paragraph')
+        num_sent_nodes = g.num_nodes('sentence')
+        num_ent_nodes = g.num_nodes('entity')
+
+        para_node_input = torch.zeros(num_para_nodes, self.config.hidden_size * 2).to(M.device)
+        sent_node_input = torch.zeros(num_sent_nodes, self.config.hidden_size * 2).to(M.device)
+        ent_node_input = torch.zeros(num_ent_nodes, self.config.hidden_size * 2).to(M.device)
 
         valid_para_count = 0
-        for i, p_span in enumerate(para_idx):
+        for i, p_span in enumerate(para_idx[:num_para_nodes]):
             if p_span[0] < max_len and p_span[1] < max_len:
                 para_node_input[i] = torch.cat((M_temp[p_span[0]][self.config.hidden_size:], M_temp[p_span[1]][:self.config.hidden_size]))
                 valid_para_count += 1
         valid_sent_count = 0
-        for i, s_span in enumerate(sent_idx):
+        for i, s_span in enumerate(sent_idx[:num_sent_nodes]):
             if s_span[0] < max_len and s_span[1] < max_len:
                 sent_node_input[i] = torch.cat((M_temp[s_span[0]][self.config.hidden_size:], M_temp[s_span[1]][:self.config.hidden_size]))
                 valid_sent_count += 1
         valid_ent_count = 0
-        for i, e_span in enumerate(ent_idx):
+        for i, e_span in enumerate(ent_idx[:num_ent_nodes]):
             if e_span[0] < max_len and e_span[1] < max_len:
                 ent_node_input[i] = torch.cat((M_temp[e_span[0]][self.config.hidden_size:], M_temp[e_span[1]][:self.config.hidden_size]))
                 valid_ent_count += 1
 
-        print(f"Valid para spans: {valid_para_count}/{len(para_idx)} (max_len={max_len})")
-        print(f"Valid sent spans: {valid_sent_count}/{len(sent_idx)}")
-        print(f"Valid ent spans: {valid_ent_count}/{len(ent_idx)}")
+        print(f"Valid para spans: {valid_para_count}/{num_para_nodes} (max_len={max_len})")
+        print(f"Valid sent spans: {valid_sent_count}/{num_sent_nodes}")
+        print(f"Valid ent spans: {valid_ent_count}/{num_ent_nodes}")
         
         # Max-pooling `Q` for question representation
         Q_temp = Q.squeeze(0)
