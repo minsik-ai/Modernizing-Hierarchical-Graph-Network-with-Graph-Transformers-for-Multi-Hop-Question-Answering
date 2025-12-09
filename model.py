@@ -348,10 +348,9 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-        # Class weights using inverse frequency: class 0=185, class 1=118, class 2=17
-        # weight = total_samples / class_count
+        # Class weights using inverse frequency + label smoothing to prevent overconfidence
         type_weights = torch.tensor([1.73, 2.71, 18.8], device=answer_type_logits.device)
-        loss_fct_type = nn.CrossEntropyLoss(weight=type_weights)
+        loss_fct_type = nn.CrossEntropyLoss(weight=type_weights, label_smoothing=0.1)
 
         # Clamp positions to valid range or set to -1 (ignored)
         num_classes = start_logits.size(-1)
