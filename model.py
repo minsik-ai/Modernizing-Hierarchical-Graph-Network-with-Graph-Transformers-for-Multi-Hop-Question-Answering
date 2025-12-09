@@ -187,7 +187,23 @@ class NumericHGN(nn.Module):
         self.sent_mlp = nn.Sequential(nn.Linear(self.config.hidden_size, self.config.hidden_size), nn.Linear(self.config.hidden_size, args.num_sentences))
         self.ent_mlp = nn.Sequential(nn.Linear(self.config.hidden_size, self.config.hidden_size), nn.Linear(self.config.hidden_size, args.num_entities))
         self.span_mlp = nn.Sequential(nn.Linear(self.config.hidden_size * 4, self.config.hidden_size), nn.Linear(self.config.hidden_size, self.config.num_labels))
-        self.answer_type_mlp = nn.Sequential(nn.Linear(self.config.hidden_size * 4, self.config.hidden_size), nn.Linear(self.config.hidden_size, 3))
+        self.answer_type_mlp = nn.Sequential(
+            nn.Linear(self.config.hidden_size * 4, self.config.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.config.hidden_size, 3)
+        )
+
+        # Initialize the final classification layer with small weights
+        # to prevent initial bias toward any class
+        self._init_answer_type_weights()
+
+    def _init_answer_type_weights(self):
+        """Initialize answer type MLP weights to prevent bias toward any class."""
+        # Get the final linear layer (index 3 after Linear, ReLU, Dropout)
+        final_layer = self.answer_type_mlp[3]
+        nn.init.xavier_uniform_(final_layer.weight)
+        nn.init.zeros_(final_layer.bias)
 
     def forward(self, input_ids, attention_mask, token_type_ids, labels, graph_out, question_ends):
         """
@@ -329,8 +345,12 @@ class NumericHGN(nn.Module):
         end_logits = end_logits.squeeze(-1)
         print("start_logits: ", start_logits.shape)
         print("end_logits: ", end_logits.shape)
-        # Use mean pooling over sequence for answer type classification
-        pooled_rep = gated_rep.mean(dim=1)  # [batch, hidden*4]
+        # Use combination of CLS representation and mean pooling for answer type classification
+        # This gives better signal for distinguishing answer types
+        cls_rep = gated_rep[:, 0, :]  # CLS token representation [batch, hidden*4]
+        mean_rep = gated_rep.mean(dim=1)  # Mean pooling [batch, hidden*4]
+        # Use CLS representation primarily (it captures global semantics better)
+        pooled_rep = cls_rep + 0.5 * mean_rep  # Weighted combination
         answer_type_logits = self.answer_type_mlp(pooled_rep)
         print("answer_type_logit (shape): ", answer_type_logits.shape)
         print("answer_type_lbl: ", answer_type_lbl)
@@ -348,9 +368,21 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-        # Class weights using inverse frequency
-        type_weights = torch.tensor([1.73, 2.71, 18.8], device=answer_type_logits.device)
-        loss_fct_type = nn.CrossEntropyLoss(weight=type_weights)
+        # Focal loss for answer type classification
+        # Focal loss: FL(p_t) = -alpha * (1-p_t)^gamma * log(p_t)
+        # This down-weights easy examples and focuses on hard ones
+        gamma = 2.0  # focusing parameter
+        type_weights = torch.tensor([1.0, 3.0, 10.0], device=answer_type_logits.device)
+
+        # Temperature scaling to prevent overconfidence during training
+        temperature = 1.5 if self.training else 1.0
+        scaled_logits = answer_type_logits / temperature
+
+        # Compute focal loss manually
+        ce_loss = F.cross_entropy(scaled_logits, answer_type_lbl, weight=type_weights, reduction='none')
+        pt = torch.exp(-ce_loss)  # probability of correct class
+        focal_weight = (1 - pt) ** gamma
+        loss_type = (focal_weight * ce_loss).mean()
 
         # Clamp positions to valid range or set to -1 (ignored)
         num_classes = start_logits.size(-1)
@@ -367,8 +399,6 @@ class NumericHGN(nn.Module):
             loss_end = loss_fct(end_logits, end_pos)
         else:
             loss_end = torch.tensor(0.0, device=end_logits.device)
-
-        loss_type = loss_fct_type(answer_type_logits, answer_type_lbl)
 
         losses["start"] = loss_start
         losses["end"] = loss_end
