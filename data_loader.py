@@ -405,7 +405,11 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
 
             # `answer_type_lbl`: [span, entity, yes/no]
             # `span_idx` for answer within the given context of length "n"
-            span_idx = (0, 1)  # Default value
+
+            answer_tok = tokenizer.tokenize(example.answer)
+            context_tok = tokenizer.tokenize(context)
+
+            span_idx = (0, len(context_tok))  # Default value
             if (example.answer.lower() in ["yes", "no"]) and (example._type == "comparison"):
                 answer_type_lbl = 2  # Yes/no type
             else:
@@ -413,8 +417,6 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
                     answer_type_lbl = 1  # Entity type
                 else:
                     answer_type_lbl = 0  # Span type
-                answer_tok = tokenizer.tokenize(example.answer)
-                context_tok = tokenizer.tokenize(context)
                 for sub_i in range(len(context_tok) - len(answer_tok)):
                     if context_tok[sub_i : sub_i + len(answer_tok)] == answer_tok:
                         span_idx = (sub_i, sub_i + len(answer_tok))  # The answer `span_idx` (ground-truth)
