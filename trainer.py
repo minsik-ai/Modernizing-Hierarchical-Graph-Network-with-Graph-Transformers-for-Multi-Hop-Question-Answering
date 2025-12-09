@@ -81,11 +81,13 @@ class Trainer(object):
                 batch = tuple(t.to(self.device) for t in batch)  # GPU or CPU
                 labels = (batch[3], batch[4], batch[5], batch[6])
                 question_ends = batch[7]
+                # Use modulo to handle multiple epochs over the same graph_out
+                graph_idx = step % len(self.graph_out)
                 inputs = {'input_ids': batch[0],
                           'attention_mask': batch[1],
                           'token_type_ids': batch[2],
                           'labels': labels,
-                          'graph_out': self.graph_out[step],
+                          'graph_out': self.graph_out[graph_idx],
                           'question_ends': question_ends}
                 if self.args.model_type != 'distilkobert':
                     inputs['token_type_ids'] = batch[2]
@@ -157,11 +159,13 @@ class Trainer(object):
             with torch.no_grad():
                 labels = (batch[3], batch[4], batch[5], batch[6])
                 question_ends = batch[7]
+                # Use modulo to handle index out of range
+                graph_idx = step % len(self.graph_out)
                 inputs = {'input_ids': batch[0],
                           'attention_mask': batch[1],
                           'token_type_ids': batch[2],
                           'labels': labels,
-                          'graph_out': self.graph_out[step],
+                          'graph_out': self.graph_out[graph_idx],
                           'question_ends': question_ends}
                 if self.args.model_type != 'distilkobert':
                     inputs['token_type_ids'] = batch[2]
