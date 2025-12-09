@@ -241,7 +241,12 @@ class NumericHGN(nn.Module):
         para_node_input = torch.zeros(len(para_idx), self.config.hidden_size * 2).to(M.device)
         sent_node_input = torch.zeros(len(sent_idx), self.config.hidden_size * 2).to(M.device)
         ent_node_input = torch.zeros(len(ent_idx), self.config.hidden_size * 2).to(M.device)
+        print("M_temp shape:", M_temp.shape)
+        print("question_ends:", question_ends)
+        print("para_idx spans:", para_idx)
+        print("Max para span index:", max(max(p[0], p[1]) for p in para_idx) if para_idx else "N/A")
         for i, p_span in enumerate(para_idx):
+            print(f"p_span[{i}]: start={p_span[0]}, end={p_span[1]}")
             para_node_input[i] = torch.cat((M_temp[p_span[0]][self.config.hidden_size:], M_temp[p_span[1]][:self.config.hidden_size]))
         for i, s_span in enumerate(sent_idx):
             sent_node_input[i] = torch.cat((M_temp[s_span[0]][self.config.hidden_size:], M_temp[s_span[1]][:self.config.hidden_size]))
