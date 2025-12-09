@@ -341,6 +341,11 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
+        # Class weights for answer type: class 0 (span)=56%, class 1 (entity)=25%, class 2 (yes/no)=19%
+        # Weight inversely proportional to frequency to handle imbalance
+        type_weights = torch.tensor([1.0, 2.25, 3.0], device=answer_type_logits.device)
+        loss_fct_type = nn.CrossEntropyLoss(weight=type_weights)
+
         # Clamp positions to valid range or set to -1 (ignored)
         num_classes = start_logits.size(-1)
         valid_start = start_pos.item() >= 0 and start_pos.item() < num_classes
@@ -351,12 +356,9 @@ class NumericHGN(nn.Module):
         if not valid_end:
             end_pos = torch.tensor([-1], device=end_pos.device)
 
-        # Debug: Track valid span ratio
-        print(f"[SPAN DEBUG] valid_start={valid_start}, valid_end={valid_end}, start_pos={start_pos.item()}, end_pos={end_pos.item()}, num_classes={num_classes}")
-
         loss_start = loss_fct(start_logits, start_pos)
         loss_end = loss_fct(end_logits, end_pos)
-        loss_type = loss_fct(answer_type_logits, answer_type_lbl)
+        loss_type = loss_fct_type(answer_type_logits, answer_type_lbl)
 
         losses["start"] = loss_start
         losses["end"] = loss_end
