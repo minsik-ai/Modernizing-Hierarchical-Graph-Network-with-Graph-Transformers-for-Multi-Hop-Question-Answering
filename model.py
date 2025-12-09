@@ -163,16 +163,16 @@ class NumericHGN(nn.Module):
 
         # https://docs.dgl.ai/api/python/nn.pytorch.html#dgl.nn.pytorch.HeteroGraphConv
         self.gat = dglnn.HeteroGraphConv({
-            'ps': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'sp': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'se': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'es': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pp': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'ss': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qp': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pq': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qe': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'eq': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'ps': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'sp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'se': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'es': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'pp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'ss': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'qp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'pq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'qe': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'eq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
             # TODO: Need (i) bi-directional edges and (ii) more edge types (e.g., question-paragraph, paragraph-paragraph, etc.)
         }, aggregate='sum')  # TODO: May need to change aggregate function (test it!) - ‘sum’, ‘max’, ‘min’, ‘mean’, ‘stack’.
 
