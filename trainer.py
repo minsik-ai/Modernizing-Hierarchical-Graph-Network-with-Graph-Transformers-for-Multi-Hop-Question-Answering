@@ -71,6 +71,7 @@ class Trainer(object):
         global_step = 0
         tr_loss = 0.0
         self.model.zero_grad()
+        train_pred_counts = {0: 0, 1: 0, 2: 0}  # Track prediction distribution
 
         train_iterator = trange(int(self.args.num_train_epochs), desc="Epoch")
 
@@ -96,11 +97,12 @@ class Trainer(object):
                 loss_start, loss_end, loss_type, _, _, answer_type_logits = outputs
 
                 # Debug: Print individual losses and answer type prediction
+                pred_type = answer_type_logits.argmax(dim=-1).item()
+                true_type = labels[2].item()  # answer_type_lbl
+                train_pred_counts[pred_type] += 1
                 if step % 50 == 0:
-                    pred_type = answer_type_logits.argmax(dim=-1).item()
-                    true_type = labels[2].item()  # answer_type_lbl
                     logits_vals = answer_type_logits.detach().cpu().numpy().flatten()
-                    print(f"[TRAIN DEBUG] step={step}, loss_type={loss_type.item():.4f}, pred={pred_type}, true={true_type}, logits={logits_vals}")
+                    print(f"[TRAIN DEBUG] step={step}, loss_type={loss_type.item():.4f}, pred={pred_type}, true={true_type}, logits={logits_vals}, pred_dist={train_pred_counts}")
 
                 loss = loss_type  # Only use answer type loss for now
 
