@@ -238,19 +238,26 @@ class NumericHGN(nn.Module):
 
         # Extract spans from `M`
         M_temp = M.squeeze(-2)  # TODO: This only works for `batch_size = 1` case
-        para_node_input = torch.zeros(len(para_idx), self.config.hidden_size * 2).to(M.device)
-        sent_node_input = torch.zeros(len(sent_idx), self.config.hidden_size * 2).to(M.device)
-        ent_node_input = torch.zeros(len(ent_idx), self.config.hidden_size * 2).to(M.device)
-        print("M_temp shape:", M_temp.shape)
-        print("question_ends:", question_ends)
-        print("para_idx spans:", para_idx)
-        print("Max para span index:", max(max(p[0], p[1]) for p in para_idx) if para_idx else "N/A")
-        for i, p_span in enumerate(para_idx):
-            print(f"p_span[{i}]: start={p_span[0]}, end={p_span[1]}")
+        max_len = M_temp.size(0)
+
+        # Filter spans that are within bounds
+        valid_para_idx = [(s, e) for s, e in para_idx if s < max_len and e < max_len]
+        valid_sent_idx = [(s, e) for s, e in sent_idx if s < max_len and e < max_len]
+        valid_ent_idx = [(s, e) for s, e in ent_idx if s < max_len and e < max_len]
+
+        print(f"Filtered para spans: {len(valid_para_idx)}/{len(para_idx)} within bounds (max_len={max_len})")
+        print(f"Filtered sent spans: {len(valid_sent_idx)}/{len(sent_idx)} within bounds")
+        print(f"Filtered ent spans: {len(valid_ent_idx)}/{len(ent_idx)} within bounds")
+
+        para_node_input = torch.zeros(len(valid_para_idx), self.config.hidden_size * 2).to(M.device)
+        sent_node_input = torch.zeros(len(valid_sent_idx), self.config.hidden_size * 2).to(M.device)
+        ent_node_input = torch.zeros(len(valid_ent_idx), self.config.hidden_size * 2).to(M.device)
+
+        for i, p_span in enumerate(valid_para_idx):
             para_node_input[i] = torch.cat((M_temp[p_span[0]][self.config.hidden_size:], M_temp[p_span[1]][:self.config.hidden_size]))
-        for i, s_span in enumerate(sent_idx):
+        for i, s_span in enumerate(valid_sent_idx):
             sent_node_input[i] = torch.cat((M_temp[s_span[0]][self.config.hidden_size:], M_temp[s_span[1]][:self.config.hidden_size]))
-        for i, e_span in enumerate(ent_idx):
+        for i, e_span in enumerate(valid_ent_idx):
             ent_node_input[i] = torch.cat((M_temp[e_span[0]][self.config.hidden_size:], M_temp[e_span[1]][:self.config.hidden_size]))
         
         # Max-pooling `Q` for question representation
