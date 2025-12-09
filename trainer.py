@@ -93,7 +93,13 @@ class Trainer(object):
                     inputs['token_type_ids'] = batch[2]
                 print("Inputs: ",inputs)
                 outputs = self.model(**inputs)
-                loss_start, loss_end, loss_type, _, _, _ = outputs
+                loss_start, loss_end, loss_type, _, _, answer_type_logits = outputs
+
+                # Debug: Print individual losses and answer type prediction
+                if step % 50 == 0:
+                    pred_type = answer_type_logits.argmax(dim=-1).item()
+                    true_type = labels[2].item()  # answer_type_lbl
+                    print(f"[TRAIN DEBUG] step={step}, loss_start={loss_start.item():.4f}, loss_end={loss_end.item():.4f}, loss_type={loss_type.item():.4f}, pred={pred_type}, true={true_type}")
 
                 loss = loss_start + loss_end + loss_type  # Combined loss
 
