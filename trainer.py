@@ -99,7 +99,8 @@ class Trainer(object):
                 if step % 50 == 0:
                     pred_type = answer_type_logits.argmax(dim=-1).item()
                     true_type = labels[2].item()  # answer_type_lbl
-                    print(f"[TRAIN DEBUG] step={step}, loss_type={loss_type.item():.4f}, pred={pred_type}, true={true_type}")
+                    logits_vals = answer_type_logits.detach().cpu().numpy().flatten()
+                    print(f"[TRAIN DEBUG] step={step}, loss_type={loss_type.item():.4f}, pred={pred_type}, true={true_type}, logits={logits_vals}")
 
                 loss = loss_type  # Only use answer type loss for now
 
