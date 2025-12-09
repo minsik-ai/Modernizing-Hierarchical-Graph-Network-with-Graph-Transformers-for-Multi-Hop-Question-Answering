@@ -177,7 +177,7 @@ def convert_examples_to_features(args, examples, max_seq_len, tokenizer,
     features = []
     print("Task >> ({})".format(args.task))
     # print("Examples (length) >> ({})".format(len(examples)))
-    for (ex_index, example) in enumerate(tqdm(examples[:3200])):
+    for (ex_index, example) in enumerate(tqdm(examples[:320])):
         if ex_index % 5000 == 0:
             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
 
