@@ -324,7 +324,9 @@ class NumericHGN(nn.Module):
         end_logits = end_logits.squeeze(-1)
         print("start_logits: ", start_logits.shape)
         print("end_logits: ", end_logits.shape)
-        answer_type_logits = self.answer_type_mlp(gated_rep.squeeze(0)[:1])
+        # Use mean pooling over sequence for answer type classification
+        pooled_rep = gated_rep.mean(dim=1)  # [batch, hidden*4]
+        answer_type_logits = self.answer_type_mlp(pooled_rep)
         print("answer_type_logit (shape): ", answer_type_logits.shape)
         print("answer_type_lbl: ", answer_type_lbl)
 
