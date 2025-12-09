@@ -280,6 +280,12 @@ class NumericHGN(nn.Module):
         print("ent_initial_embed: ", ent_rep.shape)
 
         # Initialize the paragraph, sentence and entity nodes with the node representations
+        # Ensure q has shape [1, hidden_size] for single question node
+        q = q.unsqueeze(0)
+
+        print("Graph node counts:", {ntype: g.num_nodes(ntype) for ntype in g.ntypes})
+        print("Feature shapes - q:", q.shape, "para:", para_rep.shape, "sent:", sent_rep.shape, "ent:", ent_rep.shape)
+
         in_feats = {"question": q, "paragraph": para_rep, "sentence": sent_rep, "entity": ent_rep}
         g_out = self.gat(g, (in_feats, in_feats))  # TODO: Why input tuple (이 부분 dgl documentation에 존재하지 않음 - Open an Issue on their official GitHub)
         graph_rep = []
