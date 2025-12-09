@@ -154,9 +154,9 @@ class NumericHGN(nn.Module):
         self.config = config
         self.encoder = ContextEncoder(self.args, config)
 
-        # Freeze BERT encoder to prevent collapse
-        for param in self.encoder.parameters():
-            param.requires_grad = False
+        # Don't freeze encoder - train end-to-end
+        # for param in self.encoder.parameters():
+        #     param.requires_grad = False
 
         self.bi_attn = BiAttention(args, self.config.hidden_size)
         self.bi_attn_linear = nn.Linear(self.config.hidden_size * 4, self.config.hidden_size)
@@ -348,9 +348,9 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-        # Class weights using inverse frequency + label smoothing to prevent overconfidence
+        # Class weights using inverse frequency
         type_weights = torch.tensor([1.73, 2.71, 18.8], device=answer_type_logits.device)
-        loss_fct_type = nn.CrossEntropyLoss(weight=type_weights, label_smoothing=0.1)
+        loss_fct_type = nn.CrossEntropyLoss(weight=type_weights)
 
         # Clamp positions to valid range or set to -1 (ignored)
         num_classes = start_logits.size(-1)
