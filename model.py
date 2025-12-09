@@ -341,21 +341,18 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-        # Debug: check dimensions and values
-        print("start_logits shape:", start_logits.shape, "num_classes:", start_logits.size(-1))
-        print("start_pos:", start_pos, "value:", start_pos.item() if start_pos.numel() == 1 else start_pos)
-        print("end_pos:", end_pos, "value:", end_pos.item() if end_pos.numel() == 1 else end_pos)
-        print("answer_type_logits shape:", answer_type_logits.shape)
-        print("answer_type_lbl:", answer_type_lbl)
-
         # Clamp positions to valid range or set to -1 (ignored)
         num_classes = start_logits.size(-1)
-        if start_pos.item() >= num_classes or start_pos.item() < 0:
-            print(f"WARNING: start_pos {start_pos.item()} out of range [0, {num_classes}), setting to -1")
+        valid_start = start_pos.item() >= 0 and start_pos.item() < num_classes
+        valid_end = end_pos.item() >= 0 and end_pos.item() < num_classes
+
+        if not valid_start:
             start_pos = torch.tensor([-1], device=start_pos.device)
-        if end_pos.item() >= num_classes or end_pos.item() < 0:
-            print(f"WARNING: end_pos {end_pos.item()} out of range [0, {num_classes}), setting to -1")
+        if not valid_end:
             end_pos = torch.tensor([-1], device=end_pos.device)
+
+        # Debug: Track valid span ratio
+        print(f"[SPAN DEBUG] valid_start={valid_start}, valid_end={valid_end}, start_pos={start_pos.item()}, end_pos={end_pos.item()}, num_classes={num_classes}")
 
         loss_start = loss_fct(start_logits, start_pos)
         loss_end = loss_fct(end_logits, end_pos)
