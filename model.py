@@ -163,16 +163,16 @@ class NumericHGN(nn.Module):
 
         # https://docs.dgl.ai/api/python/nn.pytorch.html#dgl.nn.pytorch.HeteroGraphConv
         self.gat = dglnn.HeteroGraphConv({
-            'ps': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'sp': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'se': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'es': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pp': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'ss': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qp': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pq': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qe': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'eq': dglnn.GATConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'ps': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'sp': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'se': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'es': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'pp': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'ss': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'qp': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'pq': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'qe': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'eq': dglnn.TransformerConv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
             # TODO: Need (i) bi-directional edges and (ii) more edge types (e.g., question-paragraph, paragraph-paragraph, etc.)
         }, aggregate='sum')  # TODO: May need to change aggregate function (test it!) - ‘sum’, ‘max’, ‘min’, ‘mean’, ‘stack’.
 
