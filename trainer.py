@@ -79,7 +79,7 @@ class Trainer(object):
             for step, batch in enumerate(epoch_iterator):
                 self.model.train()
                 batch = tuple(t.to(self.device) for t in batch)  # GPU or CPU
-                labels = (batch[3], batch[4], batch[5])
+                labels = (batch[3], batch[4], batch[5], batch[6])
                 question_ends = batch[7]
                 inputs = {'input_ids': batch[0],
                           'attention_mask': batch[1],
