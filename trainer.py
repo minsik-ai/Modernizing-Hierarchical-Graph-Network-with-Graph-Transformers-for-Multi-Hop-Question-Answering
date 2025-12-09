@@ -192,6 +192,20 @@ class Trainer(object):
             "loss": eval_loss
         }
 
+        # Debug: Check predictions and labels distribution
+        print("\n" + "="*50)
+        print("EVALUATION DEBUG INFO")
+        print("="*50)
+        print(f"Total samples: {len(preds)}")
+        print(f"Predictions: {preds[:20]}...")  # First 20
+        print(f"Labels:      {out_label_ids[:20]}...")  # First 20
+        unique_preds, pred_counts = np.unique(preds, return_counts=True)
+        unique_labels, label_counts = np.unique(out_label_ids, return_counts=True)
+        print(f"Prediction distribution: {dict(zip(unique_preds, pred_counts))}")
+        print(f"Label distribution:      {dict(zip(unique_labels, label_counts))}")
+        print(f"Model always predicts same class: {len(unique_preds) == 1}")
+        print("="*50 + "\n")
+
         result = compute_metrics(preds, out_label_ids)
         results.update(result)
 
