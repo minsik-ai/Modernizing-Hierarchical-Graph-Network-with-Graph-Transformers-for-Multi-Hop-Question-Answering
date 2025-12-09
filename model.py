@@ -153,6 +153,11 @@ class NumericHGN(nn.Module):
         self.args = args
         self.config = config
         self.encoder = ContextEncoder(self.args, config)
+
+        # Freeze BERT encoder to prevent collapse
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+
         self.bi_attn = BiAttention(args, self.config.hidden_size)
         self.bi_attn_linear = nn.Linear(self.config.hidden_size * 4, self.config.hidden_size)
         self.bi_lstm = nn.LSTM(self.config.hidden_size, self.config.hidden_size, bidirectional=True)
