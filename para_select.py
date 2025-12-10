@@ -33,10 +33,8 @@ class ParagraphSelector(BertPreTrainedModel):
 
         loss = 0.0
         if labels is not None:
-            loss_fct = nn.BCEWithLogitsLoss()
-            labels = nn.functional.one_hot(labels, num_classes=2)
-            labels = labels.type_as(logits)
-            loss = loss_fct(logits.squeeze(-1), labels)
+            loss_fct = nn.CrossEntropyLoss()
+            loss = loss_fct(logits, labels)
         outputs = (loss,) + (logits,)
         return outputs  # (loss,), (binary_logits), logits_bert, (hidden_states), (attentions)
 
