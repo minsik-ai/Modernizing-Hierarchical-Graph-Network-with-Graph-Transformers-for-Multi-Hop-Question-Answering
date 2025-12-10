@@ -355,8 +355,14 @@ class NumericHGN(nn.Module):
         # for param in self.encoder.parameters():
         #     param.requires_grad = False
 
-        self.bi_attn = BiAttention(args, self.config.hidden_size)
-        self.bi_attn_linear = nn.Linear(self.config.hidden_size * 4, self.config.hidden_size)
+        # Ablation: BiAttention
+        self.use_bi_attention = getattr(args, 'use_bi_attention', True)
+        if self.use_bi_attention:
+            self.bi_attn = BiAttention(args, self.config.hidden_size)
+            self.bi_attn_linear = nn.Linear(self.config.hidden_size * 4, self.config.hidden_size)
+        else:
+            # Without BiAttention, we just project encoder output directly
+            self.no_bi_attn_linear = nn.Linear(self.config.hidden_size, self.config.hidden_size)
         self.bi_lstm = nn.LSTM(self.config.hidden_size, self.config.hidden_size, bidirectional=True)
         self.para_node_mlp = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
         self.sent_node_mlp = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
@@ -378,9 +384,11 @@ class NumericHGN(nn.Module):
         }, aggregate='sum')
 
         # Graph Transformer for global reasoning
+        # Ablation: num_attention_heads
+        num_heads = getattr(args, 'num_attention_heads', 4)
         self.graph_transformer = HeteroGraphTransformer(
             hidden_size=self.config.hidden_size,
-            num_heads=4,
+            num_heads=num_heads,
             num_layers=1,
             dropout=0.1
         )
@@ -388,7 +396,13 @@ class NumericHGN(nn.Module):
         # Learnable weight for GAT vs Transformer combination (initialized to favor GAT)
         self.gat_weight = nn.Parameter(torch.tensor(0.9))
 
-        self.gated_attn = GatedAttention(self.args, self.config)
+        # Ablation: Gated Attention
+        self.use_gated_attention = getattr(args, 'use_gated_attention', True)
+        if self.use_gated_attention:
+            self.gated_attn = GatedAttention(self.args, self.config)
+        else:
+            # Without Gated Attention, project graph representation to match expected output dim
+            self.no_gated_attn_linear = nn.Linear(self.config.hidden_size, self.config.hidden_size * 4)
 
         self.para_mlp = nn.Sequential(nn.Linear(self.config.hidden_size, self.config.hidden_size), nn.Linear(self.config.hidden_size, args.num_paragraphs))
         self.sent_mlp = nn.Sequential(nn.Linear(self.config.hidden_size, self.config.hidden_size), nn.Linear(self.config.hidden_size, args.num_sentences))
@@ -428,8 +442,17 @@ class NumericHGN(nn.Module):
 
         encoder_out = self.encoder(input_ids, attention_mask, token_type_ids)
         seq_out = encoder_out[0]
-        Q, C = self.bi_attn(seq_out, question_ends)
-        C = self.bi_attn_linear(C)
+
+        # Ablation: BiAttention
+        if self.use_bi_attention:
+            Q, C = self.bi_attn(seq_out, question_ends)
+            C = self.bi_attn_linear(C)
+        else:
+            # Without BiAttention: split encoder output into Q and C, project C directly
+            Q = seq_out[:, :question_ends + 1, :]
+            C = seq_out[:, question_ends + 1:, :]
+            C = self.no_bi_attn_linear(C)
+
         C = C.permute(1, 0, 2)  # Change dimension from `batch-first` to `sequence-first`
         h0 = torch.randn(2, self.args.train_batch_size, self.config.hidden_size).to(C.device)  # TODO: Think about new ways to initialize self.bi_lstm's h0 and c0
         c0 = torch.randn(2, self.args.train_batch_size, self.config.hidden_size).to(C.device)
@@ -554,7 +577,18 @@ class NumericHGN(nn.Module):
 
         M_perm = M.permute(1, 0, 2)
         graph_rep_perm = graph_rep.permute(1, 0, 2)
-        gated_rep = self.gated_attn(M_perm, graph_rep_perm)
+
+        # Ablation: Gated Attention
+        if self.use_gated_attention:
+            gated_rep = self.gated_attn(M_perm, graph_rep_perm)
+        else:
+            # Without Gated Attention: use graph representation directly (broadcast to sequence length)
+            # graph_rep_perm: [batch, num_nodes, hidden]
+            # We need to produce [batch, seq_len, hidden*4] to match downstream expectations
+            # Use mean pooling of graph nodes and broadcast to sequence length
+            graph_pooled = graph_rep_perm.mean(dim=1, keepdim=True)  # [batch, 1, hidden]
+            graph_pooled = graph_pooled.expand(-1, M_perm.size(1), -1)  # [batch, seq_len, hidden]
+            gated_rep = self.no_gated_attn_linear(graph_pooled)  # [batch, seq_len, hidden*4]
 
         print("G (shape): ", gated_rep.shape)
         start_end_logits = self.span_mlp(gated_rep)

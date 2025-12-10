@@ -71,7 +71,20 @@ if __name__ == '__main__':
     parser.add_argument("--num_sentences", default=40, type=int, help="Number of sentences in HGN graph")
     parser.add_argument("--num_paragraphs", default=4, type=int, help="Number of paragraphs in HGN graph")
 
+    # Ablation study arguments
+    parser.add_argument("--use_bi_attention", action="store_true", default=True, help="Use BiAttention layer")
+    parser.add_argument("--no_bi_attention", action="store_true", help="Disable BiAttention layer")
+    parser.add_argument("--use_gated_attention", action="store_true", default=True, help="Use Gated Attention layer")
+    parser.add_argument("--no_gated_attention", action="store_true", help="Disable Gated Attention layer")
+    parser.add_argument("--num_attention_heads", default=4, type=int, help="Number of attention heads in Graph Transformer")
+
     args = parser.parse_args()
+
+    # Handle negation flags
+    if args.no_bi_attention:
+        args.use_bi_attention = False
+    if args.no_gated_attention:
+        args.use_gated_attention = False
 
     args.model_name_or_path = MODEL_PATH_MAP[args.model_type]
     main(args)
