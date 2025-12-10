@@ -531,6 +531,10 @@ class NumericHGN(nn.Module):
                 transformer_rep_list.append(transformer_out[ntype])
         transformer_rep = torch.cat(transformer_rep_list, dim=0)
 
+        # Debug: check GAT vs Transformer variance
+        print("gat_rep MEAN/STD: ", gat_rep.mean().item(), gat_rep.std().item())
+        print("transformer_rep MEAN/STD: ", transformer_rep.mean().item(), transformer_rep.std().item())
+
         # Combine GAT and Transformer outputs
         combined = torch.cat([gat_rep, transformer_rep], dim=-1)  # [num_nodes, hidden*2]
         graph_rep = self.graph_combine(combined)  # [num_nodes, hidden]
