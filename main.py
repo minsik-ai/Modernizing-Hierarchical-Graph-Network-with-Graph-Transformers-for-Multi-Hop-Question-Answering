@@ -71,20 +71,38 @@ if __name__ == '__main__':
     parser.add_argument("--num_sentences", default=40, type=int, help="Number of sentences in HGN graph")
     parser.add_argument("--num_paragraphs", default=4, type=int, help="Number of paragraphs in HGN graph")
 
-    # Ablation study arguments
+    # Ablation study arguments - Attention mechanisms
     parser.add_argument("--use_bi_attention", action="store_true", default=True, help="Use BiAttention layer")
     parser.add_argument("--no_bi_attention", action="store_true", help="Disable BiAttention layer")
     parser.add_argument("--use_gated_attention", action="store_true", default=True, help="Use Gated Attention layer")
     parser.add_argument("--no_gated_attention", action="store_true", help="Disable Gated Attention layer")
     parser.add_argument("--num_attention_heads", default=4, type=int, help="Number of attention heads in Graph Transformer")
 
+    # Ablation study arguments - Graph architecture
+    parser.add_argument("--use_gat", action="store_true", default=True, help="Use GAT for local message passing")
+    parser.add_argument("--no_gat", action="store_true", help="Disable GAT")
+    parser.add_argument("--use_graph_transformer", action="store_true", default=True, help="Use Graph Transformer for global reasoning")
+    parser.add_argument("--no_graph_transformer", action="store_true", help="Disable Graph Transformer")
+    parser.add_argument("--no_graph", action="store_true", help="Disable all graph reasoning (use BiLSTM output directly)")
+    parser.add_argument("--num_gat_layers", default=1, type=int, help="Number of GAT layers")
+    parser.add_argument("--num_transformer_layers", default=1, type=int, help="Number of Graph Transformer layers")
+
     args = parser.parse_args()
 
-    # Handle negation flags
+    # Handle negation flags - Attention
     if args.no_bi_attention:
         args.use_bi_attention = False
     if args.no_gated_attention:
         args.use_gated_attention = False
+
+    # Handle negation flags - Graph architecture
+    if args.no_gat:
+        args.use_gat = False
+    if args.no_graph_transformer:
+        args.use_graph_transformer = False
+    if args.no_graph:
+        args.use_gat = False
+        args.use_graph_transformer = False
 
     args.model_name_or_path = MODEL_PATH_MAP[args.model_type]
     main(args)

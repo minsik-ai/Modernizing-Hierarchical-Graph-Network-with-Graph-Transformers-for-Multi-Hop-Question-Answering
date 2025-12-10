@@ -368,33 +368,44 @@ class NumericHGN(nn.Module):
         self.sent_node_mlp = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
         self.ent_node_mlp = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
 
+        # Ablation: Graph architecture flags
+        self.use_gat = getattr(args, 'use_gat', True)
+        self.use_graph_transformer = getattr(args, 'use_graph_transformer', True)
+        num_gat_layers = getattr(args, 'num_gat_layers', 1)
+        num_transformer_layers = getattr(args, 'num_transformer_layers', 1)
 
         # GAT for local message passing
-        self.gat = dglnn.HeteroGraphConv({
-            'ps': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'sp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'se': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'es': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'ss': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qe': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'eq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-        }, aggregate='sum')
+        if self.use_gat:
+            self.gat_layers = nn.ModuleList()
+            for _ in range(num_gat_layers):
+                gat_layer = dglnn.HeteroGraphConv({
+                    'ps': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'sp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'se': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'es': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'pp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'ss': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'qp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'pq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'qe': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                    'eq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+                }, aggregate='sum')
+                self.gat_layers.append(gat_layer)
 
         # Graph Transformer for global reasoning
-        # Ablation: num_attention_heads
-        num_heads = getattr(args, 'num_attention_heads', 4)
-        self.graph_transformer = HeteroGraphTransformer(
-            hidden_size=self.config.hidden_size,
-            num_heads=num_heads,
-            num_layers=1,
-            dropout=0.1
-        )
+        # Ablation: num_attention_heads and num_transformer_layers
+        if self.use_graph_transformer:
+            num_heads = getattr(args, 'num_attention_heads', 4)
+            self.graph_transformer = HeteroGraphTransformer(
+                hidden_size=self.config.hidden_size,
+                num_heads=num_heads,
+                num_layers=num_transformer_layers,
+                dropout=0.1
+            )
 
         # Learnable weight for GAT vs Transformer combination (initialized to favor GAT)
-        self.gat_weight = nn.Parameter(torch.tensor(0.9))
+        if self.use_gat and self.use_graph_transformer:
+            self.gat_weight = nn.Parameter(torch.tensor(0.9))
 
         # Ablation: Gated Attention
         self.use_gated_attention = getattr(args, 'use_gated_attention', True)
@@ -542,31 +553,61 @@ class NumericHGN(nn.Module):
 
         in_feats = {"question": q, "paragraph": para_rep, "sentence": sent_rep, "entity": ent_rep}
 
-        # GAT for local message passing
-        gat_out = self.gat(g, (in_feats, in_feats))
-        gat_rep_list = []
-        for ntype in ['question', 'paragraph', 'sentence', 'entity']:
-            if ntype in gat_out:
-                gat_rep_list.append(gat_out[ntype].squeeze(-2))  # Remove head dimension
-        gat_rep = torch.cat(gat_rep_list, dim=0)
+        # Ablation: Graph architecture
+        if self.use_gat or self.use_graph_transformer:
+            # At least one graph component is enabled
+            gat_rep = None
+            transformer_rep = None
 
-        # Graph Transformer for global reasoning
-        transformer_out = self.graph_transformer(g, in_feats)
-        transformer_rep_list = []
-        for ntype in ['question', 'paragraph', 'sentence', 'entity']:
-            if ntype in transformer_out:
-                transformer_rep_list.append(transformer_out[ntype])
-        transformer_rep = torch.cat(transformer_rep_list, dim=0)
+            # GAT for local message passing
+            if self.use_gat:
+                current_feats = in_feats
+                for gat_layer in self.gat_layers:
+                    gat_out = gat_layer(g, (current_feats, current_feats))
+                    # Update features for next layer
+                    current_feats = {}
+                    for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+                        if ntype in gat_out:
+                            current_feats[ntype] = gat_out[ntype].squeeze(-2)  # Remove head dimension
+                gat_rep_list = []
+                for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+                    if ntype in current_feats:
+                        gat_rep_list.append(current_feats[ntype])
+                gat_rep = torch.cat(gat_rep_list, dim=0)
+                print("gat_rep MEAN/STD: ", gat_rep.mean().item(), gat_rep.std().item())
 
-        # Debug: check GAT vs Transformer variance
-        print("gat_rep MEAN/STD: ", gat_rep.mean().item(), gat_rep.std().item())
-        print("transformer_rep MEAN/STD: ", transformer_rep.mean().item(), transformer_rep.std().item())
+            # Graph Transformer for global reasoning
+            if self.use_graph_transformer:
+                transformer_out = self.graph_transformer(g, in_feats)
+                transformer_rep_list = []
+                for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+                    if ntype in transformer_out:
+                        transformer_rep_list.append(transformer_out[ntype])
+                transformer_rep = torch.cat(transformer_rep_list, dim=0)
+                print("transformer_rep MEAN/STD: ", transformer_rep.mean().item(), transformer_rep.std().item())
 
-        # Learnable weighted combination: GAT preserves variance better
-        # Use sigmoid to keep weight between 0 and 1
-        gat_w = torch.sigmoid(self.gat_weight)
-        graph_rep = gat_w * gat_rep + (1 - gat_w) * transformer_rep  # [num_nodes, hidden]
-        print(f"GAT weight: {gat_w.item():.4f}")
+            # Combine GAT and Transformer outputs
+            if self.use_gat and self.use_graph_transformer:
+                # Learnable weighted combination
+                gat_w = torch.sigmoid(self.gat_weight)
+                graph_rep = gat_w * gat_rep + (1 - gat_w) * transformer_rep
+                print(f"GAT weight: {gat_w.item():.4f}")
+            elif self.use_gat:
+                # GAT only
+                graph_rep = gat_rep
+                print("Using GAT only")
+            else:
+                # Transformer only
+                graph_rep = transformer_rep
+                print("Using Graph Transformer only")
+        else:
+            # No graph reasoning: use input features directly (concatenated)
+            print("No graph reasoning: using input features directly")
+            in_feats_list = []
+            for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+                if ntype in in_feats:
+                    in_feats_list.append(in_feats[ntype])
+            graph_rep = torch.cat(in_feats_list, dim=0)  # [num_nodes, hidden]
 
         # Add batch dimension: [num_nodes, hidden] -> [num_nodes, 1, hidden]
         graph_rep = graph_rep.unsqueeze(1)
