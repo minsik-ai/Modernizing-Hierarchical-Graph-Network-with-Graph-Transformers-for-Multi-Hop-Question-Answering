@@ -25,6 +25,8 @@ MODEL_CLASSES = {
 
 MODEL_PATH_MAP = {
     'bert': 'bert-base-uncased',  # 'bert-base-multilingual-cased'
+    'roberta': 'roberta-base',
+    'albert': 'albert/albert-base-v2',
 }
 
 
