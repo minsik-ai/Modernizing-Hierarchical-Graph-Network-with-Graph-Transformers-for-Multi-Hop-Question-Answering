@@ -50,7 +50,7 @@ class ParaSelectorTrainer(object):
         self.config_class, self.model_class, _ = MODEL_CLASSES[self.args.model_type]
         # self.config = self.config_class.from_pretrained(self.args.model_name_or_path, num_labels=1, output_hidden_states=True, output_attentions=True)
 
-        self.model = ParagraphSelector.from_pretrained(self.args.model_name_or_path, num_labels=1)
+        self.model = ParagraphSelector.from_pretrained(self.args.model_name_or_path, num_labels=2)
 
         # GPU or CPU
         self.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
