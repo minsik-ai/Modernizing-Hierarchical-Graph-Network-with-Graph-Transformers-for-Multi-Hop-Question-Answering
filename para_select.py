@@ -111,7 +111,7 @@ class ParaSelectorTrainer(object):
 
                 if self.args.gradient_accumulation_steps > 1:
                     loss = loss / self.args.gradient_accumulation_steps
-                    pred = 1 if logits.squeeze(-1).item() > 0 else 0
+                    pred = logits.argmax(dim=-1).item()
                     if pred == batch[3].item():
                         acc = 1.0
                         acc /= self.args.gradient_accumulation_steps
