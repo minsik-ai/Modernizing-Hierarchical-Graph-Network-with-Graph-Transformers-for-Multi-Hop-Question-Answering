@@ -27,18 +27,17 @@ Change `mkdir` and `cd` path in `download_hotpot.sh` to `DATA_DOWNLOAD_PATH`.
 
 Download hotpot dataset
 ```bas
-$ ./download_hotpot.sh
-h```
-``````
+$ ./scripts/download_hotpot.sh
+```
 
 Training the HGN model:
 ```bash
-$ ./train.sh --do_train
+$ ./scripts/train.sh --do_train
 ```
 
 Evaluating the HGN model:
 ```bash
-$ ./train.sh --do_eval
+$ ./scripts/train.sh --do_eval
 ```
 
 ## References
