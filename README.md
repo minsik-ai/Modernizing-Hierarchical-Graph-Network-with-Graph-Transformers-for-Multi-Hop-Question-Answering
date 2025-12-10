@@ -19,14 +19,21 @@ conda env create -f environment.yml
 
 ## Path Configurations
 
-Change `--model_dir` and `--data_dir` to preferred `MODEL_OUTPUT_PATH` and `DATA_DOWNLOAD_PATH` respectively.
+Change `--model_dir` and `--data_dir` to preferred `MODEL_OUTPUT_PATH/distilbert-base-uncased` and `DATA_DOWNLOAD_PATH` respectively.
 
 Change `mkdir` and `cd` path in `download_hotpot.sh` to `DATA_DOWNLOAD_PATH`.
+
+Install distilbert before proceeding.
+
+```bash
+cd MODEL_OUTPUT_PATH
+git lfs clone https://huggingface.co/distilbert-base-uncased
+```
 
 ## Usage
 
 Download hotpot dataset
-```bas
+```bash
 $ ./scripts/download_hotpot.sh
 ```
 
