@@ -596,7 +596,7 @@ class NumericHGN(nn.Module):
         # Simple cross-entropy without fancy techniques
         # Class distribution: {0: 18, 1: 8, 2: 6} out of 32
         # Inverse frequency weights: 32/18=1.78, 32/8=4.0, 32/6=5.33
-        type_weights = torch.tensor([1.78, 4.0, 5.33], device=answer_type_logits.device)
+        type_weights = torch.tensor([1., 1., 1.], device=answer_type_logits.device)
         loss_fct_type = nn.CrossEntropyLoss(weight=type_weights)
         loss_type = loss_fct_type(answer_type_logits, answer_type_lbl)
 
