@@ -304,8 +304,9 @@ class ContextEncoder(BertPreTrainedModel):
         self.encoder = self.model_class.from_pretrained(self.args.model_name_or_path, config=self.config)
 
     def forward(self, input_ids, attention_mask, token_type_ids=None):
-        # RoBERTa doesn't use token_type_ids, only pass if model supports it
-        if 'roberta' in self.args.model_type.lower():
+        # RoBERTa and DistilBERT don't use token_type_ids
+        model_type = self.args.model_type.lower()
+        if 'roberta' in model_type or 'distilbert' in model_type:
             encoded_out = self.encoder(input_ids, attention_mask=attention_mask)
         else:
             encoded_out = self.encoder(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
