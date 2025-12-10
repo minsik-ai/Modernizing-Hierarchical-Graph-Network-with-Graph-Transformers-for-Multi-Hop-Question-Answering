@@ -137,8 +137,8 @@ class HeteroGraphTransformer(nn.Module):
         # Node type embeddings to distinguish different node types
         self.node_type_embed = nn.Embedding(4, hidden_size)  # 4 types: question, paragraph, sentence, entity
 
-        # Skip connection weight - start with mostly original features
-        self.skip_weight = nn.Parameter(torch.tensor(0.2))  # Only 20% transformer, 80% original
+        # Skip connection weight - heavily favor original features to preserve sample variance
+        self.skip_weight = nn.Parameter(torch.tensor(0.05))  # Only 5% transformer, 95% original
 
     def forward(self, g, node_feats):
         """
@@ -176,8 +176,8 @@ class HeteroGraphTransformer(nn.Module):
         h_input = h.clone()  # Save for skip connection
         type_ids = torch.cat(all_type_ids, dim=0)  # [total_nodes]
 
-        # Add node type embeddings (scaled down)
-        h = h + 0.1 * self.node_type_embed(type_ids)
+        # Add node type embeddings (very small scale to not dominate)
+        h = h + 0.01 * self.node_type_embed(type_ids)
 
         # Convert to homogeneous graph
         homo_g = dgl.to_homogeneous(g)
