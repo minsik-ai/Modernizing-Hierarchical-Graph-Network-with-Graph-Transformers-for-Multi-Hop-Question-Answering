@@ -28,13 +28,12 @@ class GraphTransformerLayer(nn.Module):
         self.v_proj = nn.Linear(hidden_size, hidden_size)
         self.out_proj = nn.Linear(hidden_size, hidden_size)
 
-        # Feed-forward network
+        # Feed-forward network (smaller, simpler)
         self.ffn = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size * 4),
-            nn.GELU(),
+            nn.Linear(hidden_size, hidden_size * 2),
+            nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_size * 4, hidden_size),
-            nn.Dropout(dropout)
+            nn.Linear(hidden_size * 2, hidden_size),
         )
 
         # Layer normalization
@@ -43,6 +42,19 @@ class GraphTransformerLayer(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
         self.scale = self.head_dim ** -0.5
+
+        # Initialize weights properly
+        self._init_weights()
+
+    def _init_weights(self):
+        """Initialize weights with small values to prevent gradient explosion."""
+        for module in [self.q_proj, self.k_proj, self.v_proj, self.out_proj]:
+            nn.init.xavier_uniform_(module.weight, gain=0.1)
+            nn.init.zeros_(module.bias)
+        for module in self.ffn:
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight, gain=0.1)
+                nn.init.zeros_(module.bias)
 
     def forward(self, g, h):
         """
@@ -125,8 +137,8 @@ class HeteroGraphTransformer(nn.Module):
         # Node type embeddings to distinguish different node types
         self.node_type_embed = nn.Embedding(4, hidden_size)  # 4 types: question, paragraph, sentence, entity
 
-        # Skip connection weight (learnable)
-        self.skip_weight = nn.Parameter(torch.tensor(0.5))
+        # Skip connection weight - start with mostly original features
+        self.skip_weight = nn.Parameter(torch.tensor(0.2))  # Only 20% transformer, 80% original
 
     def forward(self, g, node_feats):
         """
