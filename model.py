@@ -1,11 +1,186 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 
 from transformers import BertPreTrainedModel
 import dgl.nn.pytorch as dglnn
 
 from utils import MODEL_CLASSES
+
+
+class GraphTransformerLayer(nn.Module):
+    """
+    Graph Transformer Layer for heterogeneous graphs.
+    Implements multi-head self-attention over graph structure.
+    """
+    def __init__(self, hidden_size, num_heads=4, dropout=0.1):
+        super(GraphTransformerLayer, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
+        self.head_dim = hidden_size // num_heads
+
+        assert hidden_size % num_heads == 0, "hidden_size must be divisible by num_heads"
+
+        # Query, Key, Value projections
+        self.q_proj = nn.Linear(hidden_size, hidden_size)
+        self.k_proj = nn.Linear(hidden_size, hidden_size)
+        self.v_proj = nn.Linear(hidden_size, hidden_size)
+        self.out_proj = nn.Linear(hidden_size, hidden_size)
+
+        # Feed-forward network
+        self.ffn = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size * 4, hidden_size),
+            nn.Dropout(dropout)
+        )
+
+        # Layer normalization
+        self.norm1 = nn.LayerNorm(hidden_size)
+        self.norm2 = nn.LayerNorm(hidden_size)
+
+        self.dropout = nn.Dropout(dropout)
+        self.scale = self.head_dim ** -0.5
+
+    def forward(self, g, h):
+        """
+        Args:
+            g: DGL graph (homogeneous, converted from heterogeneous)
+            h: Node features [num_nodes, hidden_size]
+        Returns:
+            Updated node features [num_nodes, hidden_size]
+        """
+        # Self-attention with residual
+        h_norm = self.norm1(h)
+
+        # Compute Q, K, V
+        Q = self.q_proj(h_norm)
+        K = self.k_proj(h_norm)
+        V = self.v_proj(h_norm)
+
+        # Reshape for multi-head attention
+        num_nodes = h.size(0)
+        Q = Q.view(num_nodes, self.num_heads, self.head_dim)
+        K = K.view(num_nodes, self.num_heads, self.head_dim)
+        V = V.view(num_nodes, self.num_heads, self.head_dim)
+
+        # Message passing attention
+        with g.local_scope():
+            g.ndata['q'] = Q
+            g.ndata['k'] = K
+            g.ndata['v'] = V
+
+            # Compute attention scores on edges
+            g.apply_edges(self._compute_attention_scores)
+
+            # Apply softmax over incoming edges
+            edge_weights = dgl.ops.edge_softmax(g, g.edata['attn'])
+            g.edata['attn'] = edge_weights
+
+            # Message passing: aggregate values weighted by attention
+            g.update_all(
+                dgl.function.u_mul_e('v', 'attn', 'm'),
+                dgl.function.sum('m', 'h_new')
+            )
+
+            h_attn = g.ndata['h_new'].view(num_nodes, self.hidden_size)
+
+        h_attn = self.out_proj(h_attn)
+        h = h + self.dropout(h_attn)
+
+        # FFN with residual
+        h = h + self.ffn(self.norm2(h))
+
+        return h
+
+    def _compute_attention_scores(self, edges):
+        """Compute attention scores for edges."""
+        # [num_edges, num_heads, head_dim]
+        q = edges.dst['q']
+        k = edges.src['k']
+
+        # Scaled dot-product attention
+        attn = (q * k).sum(dim=-1) * self.scale  # [num_edges, num_heads]
+
+        return {'attn': attn.unsqueeze(-1)}  # [num_edges, num_heads, 1]
+
+
+class HeteroGraphTransformer(nn.Module):
+    """
+    Heterogeneous Graph Transformer that handles different node and edge types.
+    """
+    def __init__(self, hidden_size, num_heads=4, num_layers=2, dropout=0.1):
+        super(HeteroGraphTransformer, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        # Graph Transformer layers
+        self.layers = nn.ModuleList([
+            GraphTransformerLayer(hidden_size, num_heads, dropout)
+            for _ in range(num_layers)
+        ])
+
+        # Node type embeddings to distinguish different node types
+        self.node_type_embed = nn.Embedding(4, hidden_size)  # 4 types: question, paragraph, sentence, entity
+
+    def forward(self, g, node_feats):
+        """
+        Args:
+            g: DGL heterogeneous graph
+            node_feats: dict of node features {ntype: tensor}
+        Returns:
+            dict of updated node features {ntype: tensor}
+        """
+        # Convert heterogeneous graph to homogeneous for transformer
+        # Store mapping for later reconstruction
+        node_types = ['question', 'paragraph', 'sentence', 'entity']
+        type_to_idx = {t: i for i, t in enumerate(node_types)}
+
+        # Collect all node features and create type indicators
+        all_feats = []
+        all_type_ids = []
+        node_counts = {}
+
+        for ntype in node_types:
+            if ntype in node_feats and g.num_nodes(ntype) > 0:
+                feat = node_feats[ntype]
+                num_nodes = feat.size(0)
+                node_counts[ntype] = num_nodes
+                all_feats.append(feat)
+                all_type_ids.append(torch.full((num_nodes,), type_to_idx[ntype],
+                                               dtype=torch.long, device=feat.device))
+            else:
+                node_counts[ntype] = 0
+
+        if len(all_feats) == 0:
+            return node_feats
+
+        # Concatenate all features
+        h = torch.cat(all_feats, dim=0)  # [total_nodes, hidden_size]
+        type_ids = torch.cat(all_type_ids, dim=0)  # [total_nodes]
+
+        # Add node type embeddings
+        h = h + self.node_type_embed(type_ids)
+
+        # Convert to homogeneous graph
+        homo_g = dgl.to_homogeneous(g)
+
+        # Apply transformer layers
+        for layer in self.layers:
+            h = layer(homo_g, h)
+
+        # Split back to heterogeneous format
+        result = {}
+        offset = 0
+        for ntype in node_types:
+            count = node_counts[ntype]
+            if count > 0:
+                result[ntype] = h[offset:offset + count]
+                offset += count
+
+        return result
 
 
 class GATLayer(nn.Module):
@@ -166,20 +341,13 @@ class NumericHGN(nn.Module):
         self.ent_node_mlp = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
 
 
-        # https://docs.dgl.ai/api/python/nn.pytorch.html#dgl.nn.pytorch.HeteroGraphConv
-        self.gat = dglnn.HeteroGraphConv({
-            'ps': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'sp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'se': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'es': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'ss': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'pq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'qe': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            'eq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-            # TODO: Need (i) bi-directional edges and (ii) more edge types (e.g., question-paragraph, paragraph-paragraph, etc.)
-        }, aggregate='sum')  # TODO: May need to change aggregate function (test it!) - ‘sum’, ‘max’, ‘min’, ‘mean’, ‘stack’.
+        # Graph Transformer for heterogeneous graph reasoning
+        self.graph_transformer = HeteroGraphTransformer(
+            hidden_size=self.config.hidden_size,
+            num_heads=4,
+            num_layers=2,
+            dropout=0.1
+        )
 
         self.gated_attn = GatedAttention(self.args, self.config)
 
@@ -312,24 +480,31 @@ class NumericHGN(nn.Module):
         print("Feature shapes - q:", q.shape, "para:", para_rep.shape, "sent:", sent_rep.shape, "ent:", ent_rep.shape)
 
         in_feats = {"question": q, "paragraph": para_rep, "sentence": sent_rep, "entity": ent_rep}
-        g_out = self.gat(g, (in_feats, in_feats))  # TODO: Why input tuple (이 부분 dgl documentation에 존재하지 않음 - Open an Issue on their official GitHub)
-        graph_rep = []
-        for k, v in g_out.items():
-            if len(graph_rep) == 0:
-                graph_rep = v
-            else:
-                graph_rep = torch.cat((graph_rep, v), dim=0)
+
+        # Use Graph Transformer for message passing
+        g_out = self.graph_transformer(g, in_feats)
+
+        # Concatenate all node representations in order
+        graph_rep_list = []
+        for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+            if ntype in g_out:
+                graph_rep_list.append(g_out[ntype])
+        graph_rep = torch.cat(graph_rep_list, dim=0)
+        # Add batch dimension: [num_nodes, hidden] -> [num_nodes, 1, hidden]
+        graph_rep = graph_rep.unsqueeze(1)
 
         print("graph_rep (shape): ", graph_rep.shape)
         print("g (ntypes): ", g.ntypes)
         print("g (etypes): ", g.etypes)
-        print("g_out: ", g_out)
-        print("g_out (length): ", len(g_out))
         print("g_out (keys): ", g_out.keys())
-        print("g_out - entities: ", g_out["entity"].shape)
-        print("g_out - sentence: ", g_out["sentence"].shape)
-        print("g_out - question: ", g_out["question"].shape)
-        print("g_out - paragraph: ", g_out["paragraph"].shape)
+        if "entity" in g_out:
+            print("g_out - entities: ", g_out["entity"].shape)
+        if "sentence" in g_out:
+            print("g_out - sentence: ", g_out["sentence"].shape)
+        if "question" in g_out:
+            print("g_out - question: ", g_out["question"].shape)
+        if "paragraph" in g_out:
+            print("g_out - paragraph: ", g_out["paragraph"].shape)
 
         M_perm = M.permute(1, 0, 2)
         graph_rep_perm = graph_rep.permute(1, 0, 2)
