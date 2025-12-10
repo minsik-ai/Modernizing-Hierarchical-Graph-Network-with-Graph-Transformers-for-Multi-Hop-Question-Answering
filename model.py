@@ -580,19 +580,12 @@ class NumericHGN(nn.Module):
         # sometimes the start/end positions are outside our model inputs, we ignore these terms
         loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
 
-        # Focal loss for answer type classification with label smoothing
-        gamma = 2.0  # focusing parameter
-        type_weights = torch.tensor([1.0, 3.0, 10.0], device=answer_type_logits.device)
-
-        # Temperature scaling to prevent overconfidence during training
-        temperature = 1.5 if self.training else 1.0
-        scaled_logits = answer_type_logits / temperature
-
-        # Compute focal loss with label smoothing (0.1)
-        ce_loss = F.cross_entropy(scaled_logits, answer_type_lbl, weight=type_weights, reduction='none', label_smoothing=0.1)
-        pt = torch.exp(-ce_loss)  # probability of correct class
-        focal_weight = (1 - pt) ** gamma
-        loss_type = (focal_weight * ce_loss).mean()
+        # Simple cross-entropy without fancy techniques
+        # Class distribution: {0: 18, 1: 8, 2: 6} out of 32
+        # Inverse frequency weights: 32/18=1.78, 32/8=4.0, 32/6=5.33
+        type_weights = torch.tensor([1.78, 4.0, 5.33], device=answer_type_logits.device)
+        loss_fct_type = nn.CrossEntropyLoss(weight=type_weights)
+        loss_type = loss_fct_type(answer_type_logits, answer_type_lbl)
 
         # Clamp positions to valid range or set to -1 (ignored)
         num_classes = start_logits.size(-1)
