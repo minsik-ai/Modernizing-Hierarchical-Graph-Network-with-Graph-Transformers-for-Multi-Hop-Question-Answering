@@ -381,6 +381,9 @@ class NumericHGN(nn.Module):
             dropout=0.1
         )
 
+        # Learnable weight for GAT vs Transformer combination (initialized to favor GAT)
+        self.gat_weight = nn.Parameter(torch.tensor(0.9))
+
         self.gated_attn = GatedAttention(self.args, self.config)
 
         self.para_mlp = nn.Sequential(nn.Linear(self.config.hidden_size, self.config.hidden_size), nn.Linear(self.config.hidden_size, args.num_paragraphs))
@@ -532,9 +535,11 @@ class NumericHGN(nn.Module):
         print("gat_rep MEAN/STD: ", gat_rep.mean().item(), gat_rep.std().item())
         print("transformer_rep MEAN/STD: ", transformer_rep.mean().item(), transformer_rep.std().item())
 
-        # Weighted combination: GAT preserves variance better, so weight it more heavily
-        # GAT (90%) + Transformer (10%) to keep sample-specific information
-        graph_rep = 0.9 * gat_rep + 0.1 * transformer_rep  # [num_nodes, hidden]
+        # Learnable weighted combination: GAT preserves variance better
+        # Use sigmoid to keep weight between 0 and 1
+        gat_w = torch.sigmoid(self.gat_weight)
+        graph_rep = gat_w * gat_rep + (1 - gat_w) * transformer_rep  # [num_nodes, hidden]
+        print(f"GAT weight: {gat_w.item():.4f}")
 
         # Add batch dimension: [num_nodes, hidden] -> [num_nodes, 1, hidden]
         graph_rep = graph_rep.unsqueeze(1)
