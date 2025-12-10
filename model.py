@@ -381,9 +381,6 @@ class NumericHGN(nn.Module):
             dropout=0.1
         )
 
-        # Combine GAT and Transformer outputs
-        self.graph_combine = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
-
         self.gated_attn = GatedAttention(self.args, self.config)
 
         self.para_mlp = nn.Sequential(nn.Linear(self.config.hidden_size, self.config.hidden_size), nn.Linear(self.config.hidden_size, args.num_paragraphs))
@@ -535,9 +532,9 @@ class NumericHGN(nn.Module):
         print("gat_rep MEAN/STD: ", gat_rep.mean().item(), gat_rep.std().item())
         print("transformer_rep MEAN/STD: ", transformer_rep.mean().item(), transformer_rep.std().item())
 
-        # Combine GAT and Transformer outputs
-        combined = torch.cat([gat_rep, transformer_rep], dim=-1)  # [num_nodes, hidden*2]
-        graph_rep = self.graph_combine(combined)  # [num_nodes, hidden]
+        # Weighted combination: GAT preserves variance better, so weight it more heavily
+        # GAT (90%) + Transformer (10%) to keep sample-specific information
+        graph_rep = 0.9 * gat_rep + 0.1 * transformer_rep  # [num_nodes, hidden]
 
         # Add batch dimension: [num_nodes, hidden] -> [num_nodes, 1, hidden]
         graph_rep = graph_rep.unsqueeze(1)
