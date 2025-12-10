@@ -87,6 +87,14 @@ if __name__ == '__main__':
     parser.add_argument("--num_gat_layers", default=1, type=int, help="Number of GAT layers")
     parser.add_argument("--num_transformer_layers", default=1, type=int, help="Number of Graph Transformer layers")
 
+    # Ablation study arguments - Node types
+    parser.add_argument("--use_entity_nodes", action="store_true", default=True, help="Use entity nodes in graph")
+    parser.add_argument("--no_entity_nodes", action="store_true", help="Disable entity nodes")
+    parser.add_argument("--use_sentence_nodes", action="store_true", default=True, help="Use sentence nodes in graph")
+    parser.add_argument("--no_sentence_nodes", action="store_true", help="Disable sentence nodes")
+    parser.add_argument("--use_node_type_embed", action="store_true", default=True, help="Use node type embeddings in Graph Transformer")
+    parser.add_argument("--no_node_type_embed", action="store_true", help="Disable node type embeddings")
+
     args = parser.parse_args()
 
     # Handle negation flags - Attention
@@ -103,6 +111,14 @@ if __name__ == '__main__':
     if args.no_graph:
         args.use_gat = False
         args.use_graph_transformer = False
+
+    # Handle negation flags - Node types
+    if args.no_entity_nodes:
+        args.use_entity_nodes = False
+    if args.no_sentence_nodes:
+        args.use_sentence_nodes = False
+    if args.no_node_type_embed:
+        args.use_node_type_embed = False
 
     args.model_name_or_path = MODEL_PATH_MAP[args.model_type]
     main(args)

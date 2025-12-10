@@ -123,10 +123,11 @@ class HeteroGraphTransformer(nn.Module):
     """
     Heterogeneous Graph Transformer that handles different node and edge types.
     """
-    def __init__(self, hidden_size, num_heads=4, num_layers=1, dropout=0.1):
+    def __init__(self, hidden_size, num_heads=4, num_layers=1, dropout=0.1, use_node_type_embed=True):
         super(HeteroGraphTransformer, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
+        self.use_node_type_embed = use_node_type_embed
 
         # Single Graph Transformer layer (simpler)
         self.layers = nn.ModuleList([
@@ -134,30 +135,33 @@ class HeteroGraphTransformer(nn.Module):
             for _ in range(num_layers)
         ])
 
-        # Node type embeddings to distinguish different node types
-        self.node_type_embed = nn.Embedding(4, hidden_size)  # 4 types: question, paragraph, sentence, entity
+        # Node type embeddings to distinguish different node types (ablation: can be disabled)
+        if self.use_node_type_embed:
+            self.node_type_embed = nn.Embedding(4, hidden_size)  # 4 types: question, paragraph, sentence, entity
 
         # Skip connection weight - heavily favor original features to preserve sample variance
         self.skip_weight = nn.Parameter(torch.tensor(0.05))  # Only 5% transformer, 95% original
 
-    def forward(self, g, node_feats):
+    def forward(self, g, node_feats, active_node_types=None):
         """
         Args:
             g: DGL heterogeneous graph
             node_feats: dict of node features {ntype: tensor}
+            active_node_types: list of node types to use (default: all)
         Returns:
             dict of updated node features {ntype: tensor}
         """
         # Convert heterogeneous graph to homogeneous for transformer
-        node_types = ['question', 'paragraph', 'sentence', 'entity']
-        type_to_idx = {t: i for i, t in enumerate(node_types)}
+        if active_node_types is None:
+            active_node_types = ['question', 'paragraph', 'sentence', 'entity']
+        type_to_idx = {t: i for i, t in enumerate(['question', 'paragraph', 'sentence', 'entity'])}
 
         # Collect all node features and create type indicators
         all_feats = []
         all_type_ids = []
         node_counts = {}
 
-        for ntype in node_types:
+        for ntype in active_node_types:
             if ntype in node_feats and g.num_nodes(ntype) > 0:
                 feat = node_feats[ntype]
                 num_nodes = feat.size(0)
@@ -176,8 +180,9 @@ class HeteroGraphTransformer(nn.Module):
         h_input = h.clone()  # Save for skip connection
         type_ids = torch.cat(all_type_ids, dim=0)  # [total_nodes]
 
-        # Add node type embeddings (very small scale to not dominate)
-        h = h + 0.01 * self.node_type_embed(type_ids)
+        # Add node type embeddings (very small scale to not dominate) - ablation: can be disabled
+        if self.use_node_type_embed:
+            h = h + 0.01 * self.node_type_embed(type_ids)
 
         # Convert to homogeneous graph
         homo_g = dgl.to_homogeneous(g)
@@ -192,7 +197,7 @@ class HeteroGraphTransformer(nn.Module):
         # Split back to heterogeneous format
         result = {}
         offset = 0
-        for ntype in node_types:
+        for ntype in active_node_types:
             count = node_counts[ntype]
             if count > 0:
                 result[ntype] = h[offset:offset + count]
@@ -374,33 +379,57 @@ class NumericHGN(nn.Module):
         num_gat_layers = getattr(args, 'num_gat_layers', 1)
         num_transformer_layers = getattr(args, 'num_transformer_layers', 1)
 
+        # Ablation: Node type flags
+        self.use_entity_nodes = getattr(args, 'use_entity_nodes', True)
+        self.use_sentence_nodes = getattr(args, 'use_sentence_nodes', True)
+        use_node_type_embed = getattr(args, 'use_node_type_embed', True)
+
+        # Determine active node types based on ablation flags
+        self.active_node_types = ['question', 'paragraph']
+        if self.use_sentence_nodes:
+            self.active_node_types.append('sentence')
+        if self.use_entity_nodes:
+            self.active_node_types.append('entity')
+
+        # Build GAT edge types based on active node types
+        def build_gat_edge_types():
+            edge_types = {}
+            # Always include paragraph-related edges
+            edge_types['pp'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+            edge_types['qp'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+            edge_types['pq'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+
+            if self.use_sentence_nodes:
+                edge_types['ps'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+                edge_types['sp'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+                edge_types['ss'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+
+            if self.use_entity_nodes:
+                edge_types['qe'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+                edge_types['eq'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+                if self.use_sentence_nodes:
+                    edge_types['se'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+                    edge_types['es'] = dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1)
+
+            return edge_types
+
         # GAT for local message passing
         if self.use_gat:
             self.gat_layers = nn.ModuleList()
             for _ in range(num_gat_layers):
-                gat_layer = dglnn.HeteroGraphConv({
-                    'ps': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'sp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'se': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'es': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'pp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'ss': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'qp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'pq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'qe': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                    'eq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
-                }, aggregate='sum')
+                gat_layer = dglnn.HeteroGraphConv(build_gat_edge_types(), aggregate='sum')
                 self.gat_layers.append(gat_layer)
 
         # Graph Transformer for global reasoning
-        # Ablation: num_attention_heads and num_transformer_layers
+        # Ablation: num_attention_heads, num_transformer_layers, and use_node_type_embed
         if self.use_graph_transformer:
             num_heads = getattr(args, 'num_attention_heads', 4)
             self.graph_transformer = HeteroGraphTransformer(
                 hidden_size=self.config.hidden_size,
                 num_heads=num_heads,
                 num_layers=num_transformer_layers,
-                dropout=0.1
+                dropout=0.1,
+                use_node_type_embed=use_node_type_embed
             )
 
         # Learnable weight for GAT vs Transformer combination (initialized to favor GAT)
@@ -537,21 +566,30 @@ class NumericHGN(nn.Module):
 
         # Construct node representations
         para_rep = self.para_node_mlp(para_node_input)
-        sent_rep = self.sent_node_mlp(sent_node_input)
-        ent_rep = self.ent_node_mlp(ent_node_input)
+        sent_rep = self.sent_node_mlp(sent_node_input) if self.use_sentence_nodes else None
+        ent_rep = self.ent_node_mlp(ent_node_input) if self.use_entity_nodes else None
 
         print("para_initial_embed: ", para_rep.shape)
-        print("sent_initial_embed: ", sent_rep.shape)
-        print("ent_initial_embed: ", ent_rep.shape)
+        if sent_rep is not None:
+            print("sent_initial_embed: ", sent_rep.shape)
+        if ent_rep is not None:
+            print("ent_initial_embed: ", ent_rep.shape)
 
         # Initialize the paragraph, sentence and entity nodes with the node representations
         # Ensure q has shape [1, hidden_size] for single question node
         q = q.unsqueeze(0)
 
         print("Graph node counts:", {ntype: g.num_nodes(ntype) for ntype in g.ntypes})
-        print("Feature shapes - q:", q.shape, "para:", para_rep.shape, "sent:", sent_rep.shape, "ent:", ent_rep.shape)
+        print("Active node types:", self.active_node_types)
 
-        in_feats = {"question": q, "paragraph": para_rep, "sentence": sent_rep, "entity": ent_rep}
+        # Build in_feats based on active node types
+        in_feats = {"question": q, "paragraph": para_rep}
+        if self.use_sentence_nodes and sent_rep is not None:
+            in_feats["sentence"] = sent_rep
+        if self.use_entity_nodes and ent_rep is not None:
+            in_feats["entity"] = ent_rep
+
+        print("Feature shapes:", {k: v.shape for k, v in in_feats.items()})
 
         # Ablation: Graph architecture
         if self.use_gat or self.use_graph_transformer:
@@ -566,11 +604,11 @@ class NumericHGN(nn.Module):
                     gat_out = gat_layer(g, (current_feats, current_feats))
                     # Update features for next layer
                     current_feats = {}
-                    for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+                    for ntype in self.active_node_types:
                         if ntype in gat_out:
                             current_feats[ntype] = gat_out[ntype].squeeze(-2)  # Remove head dimension
                 gat_rep_list = []
-                for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+                for ntype in self.active_node_types:
                     if ntype in current_feats:
                         gat_rep_list.append(current_feats[ntype])
                 gat_rep = torch.cat(gat_rep_list, dim=0)
@@ -578,9 +616,9 @@ class NumericHGN(nn.Module):
 
             # Graph Transformer for global reasoning
             if self.use_graph_transformer:
-                transformer_out = self.graph_transformer(g, in_feats)
+                transformer_out = self.graph_transformer(g, in_feats, active_node_types=self.active_node_types)
                 transformer_rep_list = []
-                for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+                for ntype in self.active_node_types:
                     if ntype in transformer_out:
                         transformer_rep_list.append(transformer_out[ntype])
                 transformer_rep = torch.cat(transformer_rep_list, dim=0)
@@ -604,7 +642,7 @@ class NumericHGN(nn.Module):
             # No graph reasoning: use input features directly (concatenated)
             print("No graph reasoning: using input features directly")
             in_feats_list = []
-            for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+            for ntype in self.active_node_types:
                 if ntype in in_feats:
                     in_feats_list.append(in_feats[ntype])
             graph_rep = torch.cat(in_feats_list, dim=0)  # [num_nodes, hidden]
