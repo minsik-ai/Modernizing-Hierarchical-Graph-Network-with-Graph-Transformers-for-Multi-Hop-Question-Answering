@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--task", default="para_select", type=str, help="Task: `Paragraph Selection (para_select)` or `Train Model (train_model)`")  # Can be `opspam`, `yelp` or `amazon`
-    parser.add_argument("--model_dir", default="/nlp/scr/minsik/hgn_dgl/models/distilbert-base-uncased/", type=str, help="Path to save, load model")
+    parser.add_argument("--model_dir", default="/nlp/scr/minsik/hgn_dgl/models/model_out/", type=str, help="Path to save, load model")
     parser.add_argument("--data_dir", default="/nlp/scr/minsik/hgn_dgl/data", type=str, help="The input data dir")
     parser.add_argument("--train_file", default="hotpot_train_v1.1.json", type=str, help="Train file")
     parser.add_argument("--dev_file", default="hotpot_dev_distractor_v1.json", type=str, help="Dev file (distractor & full_wiki)")
