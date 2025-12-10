@@ -288,7 +288,7 @@ class BiAttention(nn.Module):
         return query, G
 
 
-class ContextEncoder(RobertaPreTrainedModel):
+class ContextEncoder(BertPreTrainedModel):
     def __init__(self, args, config):
         super().__init__(config)
         self.args = args
