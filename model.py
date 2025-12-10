@@ -347,13 +347,30 @@ class NumericHGN(nn.Module):
         self.ent_node_mlp = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
 
 
-        # Graph Transformer for heterogeneous graph reasoning
+        # GAT for local message passing
+        self.gat = dglnn.HeteroGraphConv({
+            'ps': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'sp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'se': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'es': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'pp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'ss': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'qp': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'pq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'qe': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+            'eq': dglnn.GATv2Conv(self.config.hidden_size, self.config.hidden_size, num_heads=1),
+        }, aggregate='sum')
+
+        # Graph Transformer for global reasoning
         self.graph_transformer = HeteroGraphTransformer(
             hidden_size=self.config.hidden_size,
             num_heads=4,
-            num_layers=1,  # Single layer to avoid over-smoothing
+            num_layers=1,
             dropout=0.1
         )
+
+        # Combine GAT and Transformer outputs
+        self.graph_combine = nn.Linear(self.config.hidden_size * 2, self.config.hidden_size)
 
         self.gated_attn = GatedAttention(self.args, self.config)
 
@@ -487,30 +504,32 @@ class NumericHGN(nn.Module):
 
         in_feats = {"question": q, "paragraph": para_rep, "sentence": sent_rep, "entity": ent_rep}
 
-        # Use Graph Transformer for message passing
-        g_out = self.graph_transformer(g, in_feats)
-
-        # Concatenate all node representations in order
-        graph_rep_list = []
+        # GAT for local message passing
+        gat_out = self.gat(g, (in_feats, in_feats))
+        gat_rep_list = []
         for ntype in ['question', 'paragraph', 'sentence', 'entity']:
-            if ntype in g_out:
-                graph_rep_list.append(g_out[ntype])
-        graph_rep = torch.cat(graph_rep_list, dim=0)
+            if ntype in gat_out:
+                gat_rep_list.append(gat_out[ntype].squeeze(-2))  # Remove head dimension
+        gat_rep = torch.cat(gat_rep_list, dim=0)
+
+        # Graph Transformer for global reasoning
+        transformer_out = self.graph_transformer(g, in_feats)
+        transformer_rep_list = []
+        for ntype in ['question', 'paragraph', 'sentence', 'entity']:
+            if ntype in transformer_out:
+                transformer_rep_list.append(transformer_out[ntype])
+        transformer_rep = torch.cat(transformer_rep_list, dim=0)
+
+        # Combine GAT and Transformer outputs
+        combined = torch.cat([gat_rep, transformer_rep], dim=-1)  # [num_nodes, hidden*2]
+        graph_rep = self.graph_combine(combined)  # [num_nodes, hidden]
+
         # Add batch dimension: [num_nodes, hidden] -> [num_nodes, 1, hidden]
         graph_rep = graph_rep.unsqueeze(1)
 
         print("graph_rep (shape): ", graph_rep.shape)
         print("g (ntypes): ", g.ntypes)
         print("g (etypes): ", g.etypes)
-        print("g_out (keys): ", g_out.keys())
-        if "entity" in g_out:
-            print("g_out - entities: ", g_out["entity"].shape)
-        if "sentence" in g_out:
-            print("g_out - sentence: ", g_out["sentence"].shape)
-        if "question" in g_out:
-            print("g_out - question: ", g_out["question"].shape)
-        if "paragraph" in g_out:
-            print("g_out - paragraph: ", g_out["paragraph"].shape)
 
         M_perm = M.permute(1, 0, 2)
         graph_rep_perm = graph_rep.permute(1, 0, 2)
