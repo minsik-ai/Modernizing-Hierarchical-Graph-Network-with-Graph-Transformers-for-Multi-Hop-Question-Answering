@@ -95,6 +95,9 @@ if __name__ == '__main__':
     parser.add_argument("--use_node_type_embed", action="store_true", default=True, help="Use node type embeddings in Graph Transformer")
     parser.add_argument("--no_node_type_embed", action="store_true", help="Disable node type embeddings")
 
+    # Ablation study arguments - Encoder
+    parser.add_argument("--freeze_encoder", action="store_true", help="Freeze the encoder (no fine-tuning)")
+
     args = parser.parse_args()
 
     # Handle negation flags - Attention

@@ -14,19 +14,28 @@ from transformers import (
     RobertaTokenizer,
     AlbertConfig,
     AlbertModel,
-    AlbertTokenizer
+    AlbertTokenizer,
+    DistilBertConfig,
+    DistilBertModel,
+    DistilBertTokenizer,
 )
 
 MODEL_CLASSES = {
     'bert': (BertConfig, BertModel, BertTokenizer),  # (BertConfig, BertForSequenceClassification, BertTokenizer),
+    'bert-large': (BertConfig, BertModel, BertTokenizer),
     'roberta': (RobertaConfig, RobertaModel, RobertaTokenizer),
+    'roberta-large': (RobertaConfig, RobertaModel, RobertaTokenizer),
     'albert': (AlbertConfig, AlbertModel, AlbertTokenizer),
+    'distilbert': (DistilBertConfig, DistilBertModel, DistilBertTokenizer),
 }
 
 MODEL_PATH_MAP = {
     'bert': 'bert-base-uncased',  # 'bert-base-multilingual-cased'
+    'bert-large': 'bert-large-uncased',
     'roberta': 'roberta-base',
+    'roberta-large': 'roberta-large',
     'albert': 'albert/albert-base-v2',
+    'distilbert': 'distilbert-base-uncased',
 }
 
 

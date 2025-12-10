@@ -358,9 +358,12 @@ class NumericHGN(nn.Module):
         self.config = config
         self.encoder = ContextEncoder(self.args, config)
 
-        # Don't freeze encoder - train end-to-end
-        # for param in self.encoder.parameters():
-        #     param.requires_grad = False
+        # Ablation: Freeze encoder (no fine-tuning)
+        self.freeze_encoder = getattr(args, 'freeze_encoder', False)
+        if self.freeze_encoder:
+            print("Freezing encoder parameters (no fine-tuning)")
+            for param in self.encoder.parameters():
+                param.requires_grad = False
 
         # Ablation: BiAttention
         self.use_bi_attention = getattr(args, 'use_bi_attention', True)
