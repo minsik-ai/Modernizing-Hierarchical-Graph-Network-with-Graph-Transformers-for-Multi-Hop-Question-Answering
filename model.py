@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 
-from transformers import BertPreTrainedModel
+from transformers import RobertaPreTrainedModel
 import dgl.nn.pytorch as dglnn
 
 from utils import MODEL_CLASSES
@@ -288,7 +288,7 @@ class BiAttention(nn.Module):
         return query, G
 
 
-class ContextEncoder(BertPreTrainedModel):  # TODO: Need RoBERTa-Large
+class ContextEncoder(RobertaPreTrainedModel):
     def __init__(self, args, config):
         super().__init__(config)
         self.args = args

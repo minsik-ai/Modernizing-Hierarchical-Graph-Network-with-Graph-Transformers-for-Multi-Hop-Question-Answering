@@ -43,7 +43,7 @@ if __name__ == '__main__':
     parser.add_argument("--dev_file", default="hotpot_dev_distractor_v1.json", type=str, help="Dev file (distractor & full_wiki)")
     parser.add_argument("--test_file", default="test.csv", type=str, help="Test file")
 
-    parser.add_argument("--model_type", default="bert", type=str, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
+    parser.add_argument("--model_type", default="roberta", type=str, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()))
 
     parser.add_argument('--seed', type=int, default=42, help="random seed for initialization")
     parser.add_argument("--train_batch_size", default=1, type=int, help="Batch size for training.")
