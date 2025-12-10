@@ -8,16 +8,20 @@ I have implemented it with the [Deep Graph Library (DGL)](https://www.dgl.ai/), 
 
 ## Dependencies
 
-- torch==1.4.0
-- transformers==2.10.0
-- dgl==0.5.2
-- spacy==2.2.3
-
-### Install
 ```bash
-git clone git@github.com:wilcoln/HGN-DGL.git
-cd models
+pip install -r requirements.txt
 ```
+
+or, if you prefer conda,
+```bash
+conda env create -f environment.yml
+```
+
+## Path Configurations
+
+Change `--model_dir` and `--data_dir` to preferred `MODEL_OUTPUT_PATH` and `DATA_DOWNLOAD_PATH` respectively.
+
+Change `mkdir` and `cd` path in `download_hotpot.sh` to `DATA_DOWNLOAD_PATH`.
 
 ## Usage
 
