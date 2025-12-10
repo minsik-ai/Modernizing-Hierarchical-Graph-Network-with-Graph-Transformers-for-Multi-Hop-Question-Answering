@@ -226,7 +226,7 @@ class Trainer(object):
         result = compute_metrics(preds, out_label_ids)
         results.update(result)
 
-        f1, prec, rec = f1_score(preds, out_label_ids)
+        f1, _, _ = f1_score(preds, out_label_ids)
 
         # if self.early_stopping.validate((results['loss'])):
         #     print("Early stopping... Terminating Process.")
@@ -234,14 +234,11 @@ class Trainer(object):
 
         if self.args.logger:
             logger.info('(Val.) Loss: %f', results['loss'])
-            logger.info('(Val.) Accuracy: %f', results['acc'])
             logger.info('(Val.) F1 Score: %f', f1)
-            logger.info('(Val.) Precision: %f', prec)
-            logger.info('(Val.) Recall: %f', rec)
 
         logger.info("***** Eval results *****")
-        for key in sorted(results.keys()):
-            logger.info("  %s = %s", key, str(results[key]))
+        # for key in sorted(results.keys()):
+            # logger.info("  %s = %s", key, str(results[key]))
 
 #         if self.hidden_states_list is not None:
 #             torch.save(self.hidden_states_list, os.path.join(self.args.model_dir, "last_layer.pt"))
@@ -251,8 +248,6 @@ class Trainer(object):
 #         else:
 #             raise Exception("Error: self.hidden_states_list should NOT be None")
 
-        logger.info("  prec = %s", str(prec))
-        logger.info("  rec = %s", str(rec))
         logger.info("  f1 = %s", str(f1))
 
         return results
