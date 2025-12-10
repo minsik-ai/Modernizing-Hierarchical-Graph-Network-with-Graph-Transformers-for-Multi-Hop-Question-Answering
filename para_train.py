@@ -17,16 +17,16 @@ def main(args):
 
     tokenizer = load_tokenizer(args)
     train_dataset = dev_dataset = test_dataset = None
-    # if args.do_train:
-    #     train_dataset = load_and_cache_examples(args, tokenizer, mode="train")
+    if args.do_train:
+        train_dataset = load_and_cache_examples(args, tokenizer, mode="train")
     dev_dataset = load_and_cache_examples(args, tokenizer, mode="dev")
     # test_dataset = load_and_cache_examples(args, tokenizer, mode="test")
 
     trainer = ParaSelectorTrainer(args, train_dataset, dev_dataset)
 
-    # if args.do_train:
-    #     trainer.train()
-    #     trainer.save_model()
+    if args.do_train:
+        trainer.train()
+        trainer.save_model()
 
     if args.do_eval:
         trainer.load_model()
