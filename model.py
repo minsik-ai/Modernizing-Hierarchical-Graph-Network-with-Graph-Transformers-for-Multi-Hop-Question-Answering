@@ -111,12 +111,12 @@ class HeteroGraphTransformer(nn.Module):
     """
     Heterogeneous Graph Transformer that handles different node and edge types.
     """
-    def __init__(self, hidden_size, num_heads=4, num_layers=2, dropout=0.1):
+    def __init__(self, hidden_size, num_heads=4, num_layers=1, dropout=0.1):
         super(HeteroGraphTransformer, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        # Graph Transformer layers
+        # Single Graph Transformer layer (simpler)
         self.layers = nn.ModuleList([
             GraphTransformerLayer(hidden_size, num_heads, dropout)
             for _ in range(num_layers)
@@ -124,6 +124,9 @@ class HeteroGraphTransformer(nn.Module):
 
         # Node type embeddings to distinguish different node types
         self.node_type_embed = nn.Embedding(4, hidden_size)  # 4 types: question, paragraph, sentence, entity
+
+        # Skip connection weight (learnable)
+        self.skip_weight = nn.Parameter(torch.tensor(0.5))
 
     def forward(self, g, node_feats):
         """
@@ -134,7 +137,6 @@ class HeteroGraphTransformer(nn.Module):
             dict of updated node features {ntype: tensor}
         """
         # Convert heterogeneous graph to homogeneous for transformer
-        # Store mapping for later reconstruction
         node_types = ['question', 'paragraph', 'sentence', 'entity']
         type_to_idx = {t: i for i, t in enumerate(node_types)}
 
@@ -159,10 +161,11 @@ class HeteroGraphTransformer(nn.Module):
 
         # Concatenate all features
         h = torch.cat(all_feats, dim=0)  # [total_nodes, hidden_size]
+        h_input = h.clone()  # Save for skip connection
         type_ids = torch.cat(all_type_ids, dim=0)  # [total_nodes]
 
-        # Add node type embeddings
-        h = h + self.node_type_embed(type_ids)
+        # Add node type embeddings (scaled down)
+        h = h + 0.1 * self.node_type_embed(type_ids)
 
         # Convert to homogeneous graph
         homo_g = dgl.to_homogeneous(g)
@@ -170,6 +173,9 @@ class HeteroGraphTransformer(nn.Module):
         # Apply transformer layers
         for layer in self.layers:
             h = layer(homo_g, h)
+
+        # Skip connection: combine original and transformed features
+        h = self.skip_weight * h + (1 - self.skip_weight) * h_input
 
         # Split back to heterogeneous format
         result = {}
@@ -345,7 +351,7 @@ class NumericHGN(nn.Module):
         self.graph_transformer = HeteroGraphTransformer(
             hidden_size=self.config.hidden_size,
             num_heads=4,
-            num_layers=2,
+            num_layers=1,  # Single layer to avoid over-smoothing
             dropout=0.1
         )
 
