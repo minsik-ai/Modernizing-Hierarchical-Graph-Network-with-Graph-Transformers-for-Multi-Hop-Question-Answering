@@ -17,7 +17,6 @@ I have implemented it with the [Deep Graph Library (DGL)](https://www.dgl.ai/), 
 ```bash
 git clone git@github.com:wilcoln/HGN-DGL.git
 cd models
-git lfs clone https://huggingface.co/distilbert-base-uncased
 ```
 
 ## Usage
@@ -27,17 +26,16 @@ Download hotpot dataset
 $ ./download_hotpot.sh
 h```
 ``````
-Training the paragraph selector (fine-tune the paragraph selector for paragraph retrieval):
-```bash
-$ ./para_finetune.sh
-```
 
 Training the HGN model:
 ```bash
 $ ./train.sh --do_train
 ```
 
-Add `--do_eval` for evaluation.
+Evaluating the HGN model:
+```bash
+$ ./train.sh --do_eval
+```
 
 ## References
 - [Hierarchical Graph Network (paper)](https://arxiv.org/pdf/1911.03631.pdf)
