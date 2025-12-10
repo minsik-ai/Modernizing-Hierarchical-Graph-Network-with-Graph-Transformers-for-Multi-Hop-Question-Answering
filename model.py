@@ -392,8 +392,7 @@ class NumericHGN(nn.Module):
         self.span_mlp = nn.Sequential(nn.Linear(self.config.hidden_size * 4, self.config.hidden_size), nn.Linear(self.config.hidden_size, self.config.num_labels))
         self.answer_type_mlp = nn.Sequential(
             nn.Linear(self.config.hidden_size * 4, self.config.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(0.5),  # High dropout to reduce overfitting
+            nn.Tanh(),
             nn.Linear(self.config.hidden_size, 3)
         )
 
@@ -403,8 +402,8 @@ class NumericHGN(nn.Module):
 
     def _init_answer_type_weights(self):
         """Initialize answer type MLP weights to prevent bias toward any class."""
-        # Get the final linear layer (index 3 after Linear, ReLU, Dropout)
-        final_layer = self.answer_type_mlp[3]
+        # Get the final linear layer (index 2 after Linear, Tanh)
+        final_layer = self.answer_type_mlp[2]
         nn.init.xavier_uniform_(final_layer.weight)
         nn.init.zeros_(final_layer.bias)
 
@@ -565,6 +564,7 @@ class NumericHGN(nn.Module):
         pooled_rep = cls_rep + 0.5 * mean_rep  # Weighted combination
         answer_type_logits = self.answer_type_mlp(pooled_rep)
         print("answer_type_logit (shape): ", answer_type_logits.shape)
+        print("answer_type_logits VALUES: ", answer_type_logits.detach().cpu().numpy())
         print("answer_type_lbl: ", answer_type_lbl)
 
         ignored_index = start_logits.size(-1)
