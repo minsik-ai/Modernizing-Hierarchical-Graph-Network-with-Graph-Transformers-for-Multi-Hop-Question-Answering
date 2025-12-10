@@ -98,6 +98,14 @@ if __name__ == '__main__':
     # Ablation study arguments - Encoder
     parser.add_argument("--freeze_encoder", action="store_true", help="Freeze the encoder (no fine-tuning)")
 
+    # Ablation study arguments - Skip connections
+    parser.add_argument("--transformer_skip_weight", default=0.05, type=float,
+                        help="Skip connection weight in Graph Transformer (0=full transformer, 1=no transformer). Default 0.05 means 5%% transformer + 95%% original")
+    parser.add_argument("--no_transformer_skip", action="store_true",
+                        help="Disable skip connection in Graph Transformer (use full transformer output)")
+    parser.add_argument("--gat_transformer_weight", default=0.9, type=float,
+                        help="Weight for GAT in GAT+Transformer combination (0=transformer only, 1=GAT only). Default 0.9")
+
     args = parser.parse_args()
 
     # Handle negation flags - Attention

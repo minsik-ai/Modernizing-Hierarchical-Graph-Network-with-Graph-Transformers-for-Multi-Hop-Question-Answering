@@ -123,11 +123,13 @@ class HeteroGraphTransformer(nn.Module):
     """
     Heterogeneous Graph Transformer that handles different node and edge types.
     """
-    def __init__(self, hidden_size, num_heads=4, num_layers=1, dropout=0.1, use_node_type_embed=True):
+    def __init__(self, hidden_size, num_heads=4, num_layers=1, dropout=0.1, use_node_type_embed=True,
+                 skip_weight=0.05, use_skip_connection=True):
         super(HeteroGraphTransformer, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.use_node_type_embed = use_node_type_embed
+        self.use_skip_connection = use_skip_connection
 
         # Single Graph Transformer layer (simpler)
         self.layers = nn.ModuleList([
@@ -139,8 +141,10 @@ class HeteroGraphTransformer(nn.Module):
         if self.use_node_type_embed:
             self.node_type_embed = nn.Embedding(4, hidden_size)  # 4 types: question, paragraph, sentence, entity
 
-        # Skip connection weight - heavily favor original features to preserve sample variance
-        self.skip_weight = nn.Parameter(torch.tensor(0.05))  # Only 5% transformer, 95% original
+        # Skip connection weight - ablation: can be configured or disabled
+        # skip_weight controls how much of transformer output vs original: h = skip_weight * transformer + (1-skip_weight) * original
+        if self.use_skip_connection:
+            self.skip_weight = nn.Parameter(torch.tensor(skip_weight))
 
     def forward(self, g, node_feats, active_node_types=None):
         """
@@ -192,8 +196,10 @@ class HeteroGraphTransformer(nn.Module):
         for layer in self.layers:
             h = layer(homo_g, h)
 
-        # Skip connection: combine original and transformed features
-        h = self.skip_weight * h + (1 - self.skip_weight) * h_input
+        # Skip connection: combine original and transformed features (ablation: can be disabled)
+        if self.use_skip_connection:
+            h = self.skip_weight * h + (1 - self.skip_weight) * h_input
+        # else: use full transformer output (no skip connection)
 
         # Split back to heterogeneous format - only return active node types
         result = {}
@@ -418,20 +424,26 @@ class NumericHGN(nn.Module):
                 self.gat_layers.append(gat_layer)
 
         # Graph Transformer for global reasoning
-        # Ablation: num_attention_heads, num_transformer_layers, and use_node_type_embed
+        # Ablation: num_attention_heads, num_transformer_layers, use_node_type_embed, skip connection
         if self.use_graph_transformer:
             num_heads = getattr(args, 'num_attention_heads', 4)
+            transformer_skip_weight = getattr(args, 'transformer_skip_weight', 0.05)
+            use_transformer_skip = not getattr(args, 'no_transformer_skip', False)
             self.graph_transformer = HeteroGraphTransformer(
                 hidden_size=self.config.hidden_size,
                 num_heads=num_heads,
                 num_layers=num_transformer_layers,
                 dropout=0.1,
-                use_node_type_embed=use_node_type_embed
+                use_node_type_embed=use_node_type_embed,
+                skip_weight=transformer_skip_weight,
+                use_skip_connection=use_transformer_skip
             )
 
-        # Learnable weight for GAT vs Transformer combination (initialized to favor GAT)
+        # Learnable weight for GAT vs Transformer combination
+        # Ablation: gat_transformer_weight controls the initial balance
         if self.use_gat and self.use_graph_transformer:
-            self.gat_weight = nn.Parameter(torch.tensor(0.9))
+            gat_transformer_weight = getattr(args, 'gat_transformer_weight', 0.9)
+            self.gat_weight = nn.Parameter(torch.tensor(gat_transformer_weight))
 
         # Ablation: Gated Attention
         self.use_gated_attention = getattr(args, 'use_gated_attention', True)
