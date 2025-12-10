@@ -565,6 +565,9 @@ class NumericHGN(nn.Module):
         answer_type_logits = self.answer_type_mlp(pooled_rep)
         print("answer_type_logit (shape): ", answer_type_logits.shape)
         print("answer_type_logits VALUES: ", answer_type_logits.detach().cpu().numpy())
+        print("pooled_rep MEAN/STD: ", pooled_rep.mean().item(), pooled_rep.std().item())
+        print("gated_rep MEAN/STD: ", gated_rep.mean().item(), gated_rep.std().item())
+        print("graph_rep MEAN/STD: ", graph_rep.mean().item(), graph_rep.std().item())
         print("answer_type_lbl: ", answer_type_lbl)
 
         ignored_index = start_logits.size(-1)
