@@ -248,7 +248,7 @@ class Trainer(object):
 #         else:
 #             raise Exception("Error: self.hidden_states_list should NOT be None")
 
-        logger.info("  f1 = %s", str(f1))
+        logger.info("f1 = %s", str(f1))
 
         return results
 
