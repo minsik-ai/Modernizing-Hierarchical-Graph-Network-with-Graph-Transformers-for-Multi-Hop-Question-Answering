@@ -49,10 +49,10 @@ $ ./scripts/train.sh --do_eval
 
 ## Release Notes
 
-1. Model Architecture Enhancements: Implemented GATv2 and GraphTransformer with learnable weight matrices and feed-forward network (FFN) layers (model.py)
-2. Ablation Study Support: Added comprehensive configuration options for extensive ablation experiments (main.py)
-3. Bug Fixes: Resolved span_idx indexing issue and various other bugs across the codebase (data_loader.py, model.py, main.py)
-4. Dependency Updates: Updated requirements for Python 3.9 compatibility (requirements.txt, environment.yml)
+1. **Model Architecture Enhancements**: Implemented GATv2 and GraphTransformer with learnable weight matrices and feed-forward network (FFN) layers (model.py)
+2. **Ablation Study Support**: Added comprehensive configuration options for extensive ablation experiments (main.py)
+3. **Bug Fixes**: Resolved span_idx indexing issue and various other bugs across the codebase (data_loader.py, model.py, main.py)
+4. **Dependency Updates**: Updated requirements for Python 3.9 compatibility (requirements.txt, environment.yml)
 
 [Blog post](https://medium.com/@mso-cs/modernizing-hierarchical-graph-network-with-graph-transformers-for-multi-hop-question-answering-abb015eb3232) detailing the changes.
 
