@@ -1,4 +1,4 @@
-# Hierarchical-Graph-Network-for-Multi-hop-Question-Answering (HGN)
+# Modernizing Hierarchical Graph Network with Graph Transformers for Multi-Hop Question Answering (ModernHGN)
 
 Hierarchical Graph Network (HGN) is a multi-hop reasoning pathway manifested in a hierarchical graph structure. Built and proposed by Microsoft Dynamics 365 AI Research, HGN aggregates clues from sources of differing granularity levels (e.g., paragraphs, sentences, entities). It effectively incorporates concepts from Graph Attention Network (GAT), Gated Attention and BiDAF (Seo et al., 2017) to construct a multi-hop reasoning graph network model on HotpotQA.
 
