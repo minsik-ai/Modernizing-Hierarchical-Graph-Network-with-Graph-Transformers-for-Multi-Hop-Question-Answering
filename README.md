@@ -47,7 +47,7 @@ Evaluating the HGN model:
 $ ./scripts/train.sh --do_eval
 ```
 
-## Implementations
+## Release Notes
 
 1. Model Architecture Enhancements: Implemented GATv2 and GraphTransformer with learnable weight matrices and feed-forward network (FFN) layers (model.py)
 2. Ablation Study Support: Added comprehensive configuration options for extensive ablation experiments (main.py)
